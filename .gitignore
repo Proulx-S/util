@@ -1,46 +1,116 @@
 # Windows default autosave extension
-*.asv
+**/*.asv
 
 # OSX / *nix default autosave extension
-*.m~
+**/*.m~
 
 # Compiled MEX binaries (all platforms)
-*.mex*
+**/*.mex*
 
 # Packaged app and toolbox files
-*.mlappinstall
-*.mltbx
+**/*.mlappinstall
+**/*.mltbx
 
 # Generated helpsearch folders
+**/helpsearch*/
 helpsearch*/
 
 # Simulink code generation folders
+**/slprj/
+**/sccprj/
 slprj/
 sccprj/
 
 # Matlab code generation folders
+**/codegen/
 codegen/
 
 # Simulink autosave extension
-*.autosave
+**/*.autosave
 
 # Simulink cache files
-*.slxc
+**/*.slxc
 
 # Octave session info
+**/octave-workspace
 octave-workspace
 
 # Data files
-*.mat
-*.fig
+**/*.mat
+**/*.fig
 
 # Afni
-*.err
-*.BRIK
-*.HEAD
-*.nii
-*.nii.gz
+**/*.err
+**/*.BRIK
+**/*.HEAD
+
+# Nifti files
+**/*.nii
+**/*.nii.gz
+**/*.json
+**/*.jsn
+
+# Additional large files that can slow indexing
+**/*.zip
+**/*.tar
+**/*.tar.gz
+**/*.tgz
+**/*.rar
+**/*.7z
+
+# Binary files
+**/*.bin
+**/*.dat
+**/*.bin.*
+**/*.dat.*
+
+# Log files
+**/*.log
+**/*.out
+
+# Temp files
+**/tmp/
+**/temp/
+**/.tmp/
+**/.temp/
+
+# Build directories
+**/build/
+**/dist/
+**/out/
+
+# Large data directories
+**/data/
+**/raw_data/
+**/processed_data/
+**/results/
+
+# Cache directories
+**/.cache/ 
+
+# DICOM files
+**/*.dcm
+**/*.dicom
+**/*.ima
+**/*.dic
+**/MR.*
+
+# JASON
+**/*.json
+**/*.json.gz
+**/*.json.bz2
+**/*.json.zip
+**/*.json.tar
+**/*.json.tar.gz
+
+# image files
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.gif
+**/*.bmp
+**/*.tiff
 
 # Cursor
-.cursorignore
-.code-workspace
+*.cursorignore
+*.code-workspace
