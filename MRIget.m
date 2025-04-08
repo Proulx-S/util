@@ -2,6 +2,10 @@ function val = MRIget(fspec,prop)
 global src
 
 switch prop
+    case {'tr'}
+        [~,tr] = system(strjoin({src.afni ['3dinfo -tr ' fspec]},newline));
+        tr = str2num(tr);
+        val = tr;
     case {'nt' 'nv' 'nFrame' 'nframes'}
         [~,nFrame] = system(strjoin({src.afni ['3dinfo -nt ' fspec]},newline));
         nFrame = str2num(nFrame);
