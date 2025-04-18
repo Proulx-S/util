@@ -10,6 +10,10 @@ switch prop
         [~,nFrame] = system(strjoin({src.afni ['3dinfo -nt ' fspec]},newline));
         nFrame = str2num(nFrame);
         val = nFrame;
+    case {'depth' 'nk' 'nslice' 'nslices' 'nSlice' 'nSlices' 'slice' 'slices'}
+        [~,depth] = system(strjoin({src.afni ['3dinfo -nk ' fspec]},newline));
+        depth = str2num(depth);
+        val = depth;
     case {'vox' 'voxSize' 'size'}
         [~,xyz] = system(strjoin({src.afni ['3dinfo -adi -adj -adk ' fspec]},newline));
         xyz = str2num(xyz);
