@@ -6,15 +6,14 @@ function mri = vol2vec(mri,mask,forceFlag,keepFlag)
 % vectorize 2D (time X vox) format using a user-specified mask (vol2vec.m),
 % and vice-versa (vec2vol.m).
 % This saves memory while keeping data in a compatible format.
-% When no mask is provided, only voxels that are not all zeros and do not
-% contain nans are used.
-% forceFlag = -1; will skip the main task of vectorizing the 3d volume but
-% will still do the other small things this function is doing.
+% When no mask is provided, a standard one is created to exclude voxels that are all zeros, or contain any nans, or within 5 voxels from the image edge (1 voxel in the slice direction when 3 slices or more).
+%needsEdit forceFlag = -1; will skip the main task of vectorizing the 3d volume but
+%needsEdit will still do the other small things this function is doing.
 if ~exist('mask','var')
     mask = [];
-    noMaskFlag = true;
-else
-    noMaskFlag = false;
+%     noMaskFlag = true;
+% else
+%     noMaskFlag = false;
 end
 if ~exist('forceFlag','var')
     forceFlag = false;
@@ -43,8 +42,8 @@ end
 
 
 function mri = doIt(mri,mask,forceFlag,keepFlag)
-if ~isfield(mri,'t'); mri.t = []; end
-if ~isfield(mri,'nDummy'); mri.nDummy = []; end
+% if ~isfield(mri,'t'); mri.t = []; end
+% if ~isfield(mri,'nDummy'); mri.nDummy = []; end
 
 %% Add some info to the output struct
 if ~isfield(mri,'volInfo'); [mri.volInfo] = deal(strjoin({'X' 'Y' 'Z' 'time/freq' 'taper/mode' 'run'},' x ')); end
@@ -58,19 +57,25 @@ if ~isfield(mri,'nframes')
     mri.nframes = mri.nFrame;
 end
 
-if isempty(mri.nDummy)
-    mri.nDummy = nan;
-end
-nDummy = mri.nDummy; if isnan(nDummy); nDummy = 0; end
-if isempty(mri.t)
+% if isempty(mri.nDummy)
+%     mri.nDummy = nan;
+% end
+% nDummy = mri.nDummy; if isnan(nDummy); nDummy = 0; end
+% if isempty(mri.t)
     
-    mri.t = ( (0:mri.nframes-1).*(mri.tr/1000) )'';
-end
+%     mri.t = ( (0:mri.nframes-1).*(mri.tr/1000) )'';
+% end
 
 %% Exit if enough
 if isempty(mri.vol) && isfield(mri,'vec') && ~isempty(mri.vec); return; end
 
 %% Set mask to vol2vec
+if (~exist('mask','var') || isempty(mask)) && (~isfield(mri,'vol2vec') || isempty(mri.vol2vec))
+    skipApplyMask = true;
+else
+    skipApplyMask = false;
+end
+
 if exist('mask','var') && ~isempty(mask) && ~isempty(mri.vol)
     
     if ~forceFlag && isfield(mri,'vol2vec') && ~isempty(mri.vol2vec)
@@ -95,7 +100,11 @@ else
         % zeroes
         zeroMask = all(mri.vol(:,:,:,:)==0,4);
         nanMask = any(isnan(mri.vol(:,:,:,:)),4);
-        mri.vol2vec = ~zeroMask & ~nanMask;
+        edgeMask = false(size(mri.vol,1:3));
+        edgeMask([1:5,end-4:end],:,:) = true;
+        edgeMask(:,[1:5,end-4:end],:) = true;
+        if size(mri.vol,3)>=3; edgeMask(:,:,[1 end]) = true; end
+        mri.vol2vec = ~zeroMask & ~nanMask & ~edgeMask;
         if any(~mri.vol2vec(:))
             mri.vol2vecFlag = 'validVoxMask';
         else
@@ -108,22 +117,28 @@ end
 if forceFlag==-1; return; end
 
 %% Vectorize according to vol2vec
-tmp = permute(mri.vol,[4 5 6 7 1 2 3]);
-mri.vec = permute(tmp(:,:,:,:,mri.vol2vec),[1 5 2 3 4]);
-if ~keepFlag
-    mri.vol = [];
-end
-fieldList = {'chanLabel' 't0' 'Fs'};
-for i = 1:length(fieldList)
-    if isfield(mri,fieldList{i}) && all(size(mri.(fieldList{i}),[1 2])==size(mri.vol2vec))
-        mri.(fieldList{i}) = mri.(fieldList{i})(mri.vol2vec);
+if skipApplyMask
+    if ~isfield(mri,'vec')
+        mri.vec = [];
     end
+else
+    tmp = permute(mri.vol,[4 5 6 7 1 2 3]);
+    mri.vec = permute(tmp(:,:,:,:,mri.vol2vec),[1 5 2 3 4]);
+    if ~keepFlag
+        mri.vol = [];
+    end
+    fieldList = {'chanLabel' 't0' 'Fs'};
+    for i = 1:length(fieldList)
+        if isfield(mri,fieldList{i}) && all(size(mri.(fieldList{i}),[1 2])==size(mri.vol2vec))
+            mri.(fieldList{i}) = mri.(fieldList{i})(mri.vol2vec);
+        end
+    end
+    % if isfield(mri,'volMean')
+    %     tmp = permute(mri.volMean,[4 5 6 7 1 2 3]);
+    %     mri.vecMean = permute(tmp(:,:,:,:,mri.vol2vec),[1 5 2 3 4]); clear tmp
+    %     mri.volMean = [];
+    % end
 end
-% if isfield(mri,'volMean')
-%     tmp = permute(mri.volMean,[4 5 6 7 1 2 3]);
-%     mri.vecMean = permute(tmp(:,:,:,:,mri.vol2vec),[1 5 2 3 4]); clear tmp
-%     mri.volMean = [];
-% end
 
 
 %% Beautigy a little
