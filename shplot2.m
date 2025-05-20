@@ -1,5 +1,5 @@
 function varargout = shplot2(x,y,e,hA,varargin)
-%% H = shplot(x,y,e,opt,varargin)
+%% H = shplot(x,y,e,opt,varargin) 
 % This function creates a shaded error-bar plot. It is a lightweight
 % implementation of 'shadedErrorBar' by Rob Campbell intended
 % to be used as a local function in other scripts.
