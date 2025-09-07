@@ -19,6 +19,9 @@ if nnz(size(mask)>1)==2; mask = squeeze(mask); else error('Your supposed to have
 % disabe warning
 warning('off','MATLAB:polyshape:repairedBySimplify')
 
+%% Add border to avoid edge artifacts
+mask = padarray(mask,[1 1],0,'both');
+
 %% Resize mask
 xRs = ( (1:(size(mask,1)*precisionFactor)) - 0.5 ) / precisionFactor;
 yRs = ( (1:(size(mask,2)*precisionFactor)) - 0.5 ) / precisionFactor;
@@ -30,3 +33,6 @@ M = polyshape(Mtmp(:,2:1+Mtmp(2,1))' + [0.5 0.5]); Mtmp(:,1:1+Mtmp(2,1)) = [];
 while ~isempty(Mtmp)
     M = xor(M,polyshape(Mtmp(:,2:1+Mtmp(2,1))' + [0.5 0.5])); Mtmp(:,1:1+Mtmp(2,1)) = [];
 end
+
+%% Account for padding
+M.Vertices = M.Vertices - [1 1];
