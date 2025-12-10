@@ -1,4 +1,4 @@
-function M = getMaskOutline(mask,precisionFactor)
+function M = getMaskOutline(mask,precisionFactor,xGrid,yGrid)
 % Extract contour of a mask image (0s and 1s) Matlab's polygon object M for
 % later ploting over another image ( plot(M) ).
 % Higher precisionFactor alleviates the round corners problem but is
@@ -20,6 +20,7 @@ if nnz(size(mask)>1)==2; mask = squeeze(mask); else error('Your supposed to have
 warning('off','MATLAB:polyshape:repairedBySimplify')
 
 %% Add border to avoid edge artifacts
+maskOrig = mask;
 mask = padarray(mask,[1 1],0,'both');
 
 %% Resize mask
@@ -36,3 +37,10 @@ end
 
 %% Account for padding
 M.Vertices = M.Vertices - [1 1];
+
+if exist('xGrid','var') && exist('yGrid','var') && ~isempty(xGrid) && ~isempty(yGrid)
+M.Vertices = [...
+    interp1(1:size(maskOrig,2),xGrid,M.Vertices(:,1),'linear','extrap')...
+    interp1(1:size(maskOrig,1),yGrid,M.Vertices(:,2),'linear','extrap')];
+end
+
