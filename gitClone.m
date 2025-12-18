@@ -3,6 +3,10 @@ function gitClone(url, folder, repoSubDir)
 
     if exist(fullfile(folder,repoSubDir), 'dir')
         disp([newline url ' ' repoSubDir newline 'already downloaded to:' newline ' ' folder newline]);
+        
+        % Check repository sync status
+        gitCheck(folder);
+        
     else
         cmd = {};
         if isempty(repoSubDir)
