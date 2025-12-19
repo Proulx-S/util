@@ -20,7 +20,7 @@ function scaleFont(hFig,scaleFactor);
         if ~isempty(hT.Title) && isvalid(hT.Title)
             try
                 currentTitleFontSize = hT.Title.FontSize;
-                hT.Title.FontSize = currentTitleFontSize * scaleFactor;
+                hT.Title.FontSize = currentTitleFontSize * scaleFactor/1.5;
             catch
                 % If title font size can't be accessed/set, skip it
             end
