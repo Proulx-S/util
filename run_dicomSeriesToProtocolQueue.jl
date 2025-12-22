@@ -238,6 +238,27 @@ function main()
     println("="^70)
     Base.invokelatest(dicom_series_to_protocol_queue, INPUT_DIR, OUTPUT_DIR)
     
+    # Determine the bash script name (same as the Julia script but with .sh extension)
+    bash_script_name = "dicomSeriesToProtocolQueue.sh"
+    bash_script_path = abspath(bash_script_name)
+    
+    # Execute the generated bash script
+    if isfile(bash_script_path)
+        println("\n" * "="^70)
+        println("Executing generated bash script: $bash_script_path")
+        println("="^70)
+        try
+            run(`bash $bash_script_path`)
+            println("\nBash script executed successfully.")
+        catch e
+            println("\nERROR: Failed to execute bash script: $e")
+            rethrow(e)
+        end
+    else
+        println("\nWARNING: Generated bash script not found: $bash_script_path")
+        println("The script may have been generated in a different directory.")
+    end
+    
     # Print final warning if repository is not up-to-date
     if repo_not_up_to_date
         println("\n" * repeat("!", 70))
