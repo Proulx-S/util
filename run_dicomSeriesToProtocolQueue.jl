@@ -186,8 +186,8 @@ function main()
         end
     else
         # Look in current directory
-        repo_path = pwd()
-        script_path = joinpath(repo_path, "dicomSeriesToProtocolQueue.jl")
+        base_path = pwd()
+        script_path = joinpath(base_path, "dicomSeriesToProtocolQueue.jl")
         if isfile(script_path)
             # Script is in current directory, use it directly
             println("Using script from current directory: $script_path")
@@ -195,8 +195,12 @@ function main()
             Base.invokelatest(dicom_series_to_protocol_queue, INPUT_DIR, OUTPUT_DIR)
             return
         end
-        # If REPO_PATH is empty but we need to clone, use current directory as base
-        base_path = repo_path
+        # If REPO_PATH is empty, check if repo is cloned as subdirectory of current directory
+        if !isempty(REPO_URL)
+            repo_path = find_repo_path(base_path, REPO_URL)
+        else
+            repo_path = base_path
+        end
     end
     
     # Check repository status
