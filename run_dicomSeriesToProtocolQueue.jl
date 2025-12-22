@@ -219,6 +219,10 @@ function main()
         end
     end
     
+    # Store the up-to-date status for final warning
+    repo_not_up_to_date = !is_up_to_date
+    repo_path_for_warning = repo_path
+    
     # Find and include the script
     script_path = find_script_path(repo_path)
     println("Loading script from: $script_path")
@@ -229,6 +233,14 @@ function main()
     println("Executing dicom_series_to_protocol_queue")
     println("="^70)
     Base.invokelatest(dicom_series_to_protocol_queue, INPUT_DIR, OUTPUT_DIR)
+    
+    # Print final warning if repository is not up-to-date
+    if repo_not_up_to_date
+        println("\n" * repeat("!", 70))
+        println("WARNING: The repository at $repo_path_for_warning is not up-to-date.")
+        println("Consider running 'git pull' in that directory to get the latest version.")
+        println(repeat("!", 70))
+    end
 end
 
 # Run the script
