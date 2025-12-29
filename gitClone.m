@@ -1,8 +1,8 @@
 function gitClone(url, folder, repoSubDir)
     if ~exist('repoSubDir', 'var'); repoSubDir = []; end
-
+    disp([newline '--------------------------------']);
     if exist(fullfile(folder,repoSubDir), 'dir')
-        disp([newline url ' ' repoSubDir newline 'already downloaded to:' newline ' ' folder newline]);
+        disp([url ' ' repoSubDir newline 'already downloaded to:' newline ' ' folder]);
         
         % Check repository sync status
         gitCheck(folder);

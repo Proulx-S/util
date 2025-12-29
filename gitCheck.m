@@ -2,6 +2,11 @@ function gitCheck(folder)
     % Check if a git repository is in sync with its remote
     % Only checks status, does not perform any syncing operations
     
+    % Save current backtrace state and turn off for this function
+    oldState = warning('query', 'backtrace');
+    warning('off', 'backtrace');
+    cleanup = onCleanup(@() warning(oldState.state, 'backtrace'));
+    
     % Check if it's a git repository
     gitDir = fullfile(folder, '.git');
     if ~exist(gitDir, 'dir')
@@ -10,9 +15,17 @@ function gitCheck(folder)
     end
     
     % Fetch latest changes from remote
-    [status, ~] = system(['cd ' folder ' && git fetch origin']);
+    % Use GIT_TERMINAL_PROMPT=0 to prevent hanging on credential prompts
+    % Redirect stderr to capture errors and prevent hanging
+    [status, output] = system(['cd ' folder ' && GIT_TERMINAL_PROMPT=0 git fetch origin 2>&1']);
     if status ~= 0
-        warning('Failed to fetch from remote repository');
+        % Check if it's a credential/auth error (common when run from MATLAB)
+        if contains(output, 'Username') || contains(output, 'credential') || contains(output, 'authentication')
+            warning('Git fetch skipped: authentication required (run manually if needed)');
+            warning('could not make sure repository is up to date');
+        else
+            warning('Failed to fetch from remote repository: %s', output);
+        end
         return;
     end
     
