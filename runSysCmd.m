@@ -1,4 +1,4 @@
-function cmdOut = runSysCmd(cmd, outputFile ,verbose)
+function [cmdOut, cmdErr] = runSysCmd(cmd, outputFile ,verbose)
 % runSysCmd - Execute a system command and log the command and output to a file
 %
 % Syntax:
@@ -34,16 +34,17 @@ if cmdErr
 end
 
 % Write command and output to log file
-fid = fopen(outputFile, 'w');
-fprintf(fid, '%s', strjoin(cmd, newline));
-fprintf(fid, repmat('\n', 1, 5));
-fprintf(fid, 'The above ran on %s\n%s\n', datestr(now, 'yyyy-mm-dd HH:MM:SS'), repmat('=', 1, 60));
-fprintf(fid, 'Below is the output\n');
-fprintf(fid, repmat('\n', 1, 5));
-fprintf(fid, '%s\n', cmdOut);
-fclose(fid);
-
-disp(['command and terminal output logged to:' newline ' ' outputFile]);
+if exist('outputFile','var') && ~isempty(outputFile)
+    fid = fopen(outputFile, 'w');
+    fprintf(fid, '%s', strjoin(cmd, newline));
+    fprintf(fid, repmat('\n', 1, 5));
+    fprintf(fid, 'The above ran on %s\n%s\n', datestr(now, 'yyyy-mm-dd HH:MM:SS'), repmat('=', 1, 60));
+    fprintf(fid, 'Below is the output\n');
+    fprintf(fid, repmat('\n', 1, 5));
+    fprintf(fid, '%s\n', cmdOut);
+    fclose(fid);
+    disp(['command and terminal output logged to:' newline ' ' outputFile]);
+end
 
 end
 
