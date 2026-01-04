@@ -23,6 +23,9 @@ function gitCheck(folder)
         if contains(output, 'Username') || contains(output, 'credential') || contains(output, 'authentication')
             warning('Git fetch skipped: authentication required (run manually if needed)');
             warning('could not make sure repository is up to date');
+        elseif contains(output, 'Could not resolve host') || contains(output, 'Name or service not known') || contains(output, 'network')
+            warning('Git fetch skipped: network connectivity issue (host unreachable)');
+            warning('Repository sync check skipped due to network error. Will retry on next check.');
         else
             warning('Failed to fetch from remote repository: %s', output);
         end
