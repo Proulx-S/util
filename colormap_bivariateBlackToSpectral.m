@@ -1,13 +1,14 @@
-function [RGB, Hvar, CLvar] = colormap_bivariateBlackToSpectral(Hvar,CLvar,HvarLim,CLvarLim,Hmax,Hshift,Hrange,Crange,Lrange)
-cbFlag = false;
+function [RGB, Hvar, CLvar] = colormap_bivariateBlackToSpectral(Hvar,CLvar,HvarLim,CLvarLim,Hmax,Hshift,Hrange,Crange,Lrange,cbFlag)
 
 % Dependency
 toClean.path = {};
 if exist('colorspace', 'file') ~= 2
-    toolDir = fileparts(mfilename('fullpath'));
+    toolDir = fileparts(fileparts(mfilename('fullpath')));
     tool    = 'Colorspace-Transformations'; toolURL = 'https://www.mathworks.com/matlabcentral/mlc-downloads/downloads/submissions/28790/versions/5/download/zip';
-    disp(['Downloading Colorspace-Transformations from MathWorks to' newline fullfile(toolDir, tool)]);
-    if ~exist(fullfile(toolDir, tool), 'dir'); tmpZip = fullfile(tempdir, 'shplot.zip'); websave(tmpZip, toolURL); unzip(tmpZip, fullfile(toolDir, tool)); delete(tmpZip); end
+    if ~exist(fullfile(toolDir, tool), 'dir')
+        disp(['Downloading Colorspace-Transformations from MathWorks to' newline fullfile(toolDir, tool)]);
+        tmpZip = fullfile(tempdir, 'shplot.zip'); websave(tmpZip, toolURL); unzip(tmpZip, fullfile(toolDir, tool)); delete(tmpZip);
+    end
     toClean.path{end+1} = genpath(fullfile(toolDir,tool));
     addpath(toClean.path{end});
 end
@@ -23,7 +24,9 @@ if ~exist('Hvar','var') || isempty(Hvar) || ~exist('CLvar','var') || isempty(CLv
     clvar = linspace(CLvarLim(1), CLvarLim(2), nGrid);
     hvar = linspace(HvarLim(1)  , HvarLim(2) , nGrid);
     [CLvar, Hvar] = meshgrid(clvar, hvar);
-    cbFlag = true;
+    if ~exist('cbFlag','var') || isempty(cbFlag); cbFlag = true ; else; cbFlag = false; end
+else
+    if ~exist('cbFlag','var') || isempty(cbFlag); cbFlag = false; else; cbFlag = true ; end
 end
 
 % Default limits to colormap (defined in HCL color space for perceptual independence)
