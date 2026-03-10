@@ -1,4 +1,5 @@
-function [RGB, Hvar, CLvar] = colormap_bivariateBlackToSpectral(Hvar,CLvar,HvarLim,CLvarLim,Hmax,Hshift,Hrange,Crange,Lrange,cbFlag)
+function [RGB, Hvar, CLvar, RGB_cmap, hvar_cmap, clvar_cmap] = colormap_bivariateBlackToSpectral(Hvar,CLvar,HvarLim,CLvarLim,Hmax,Hshift,Hrange,Crange,Lrange,cbFlag)
+if ~exist('cbFlag','var') || isempty(cbFlag); cbFlag = false; end
 
 % Dependency
 toClean.path = {};
@@ -24,9 +25,9 @@ if ~exist('Hvar','var') || isempty(Hvar) || ~exist('CLvar','var') || isempty(CLv
     clvar = linspace(CLvarLim(1), CLvarLim(2), nGrid);
     hvar = linspace(HvarLim(1)  , HvarLim(2) , nGrid);
     [CLvar, Hvar] = meshgrid(clvar, hvar);
-    if ~exist('cbFlag','var') || isempty(cbFlag); cbFlag = true ; else; cbFlag = false; end
+    % if ~exist('cbFlag','var') || isempty(cbFlag); cbFlag = true ; else; cbFlag = false; end
 else
-    if ~exist('cbFlag','var') || isempty(cbFlag); cbFlag = false; else; cbFlag = true ; end
+    % if ~exist('cbFlag','var') || isempty(cbFlag); cbFlag = false; else; cbFlag = true ; end
 end
 
 % Default limits to colormap (defined in HCL color space for perceptual independence)
@@ -39,10 +40,10 @@ if ~exist('Crange','var') || isempty(Crange)
     Crange = [0 35]; % [0 100]
 end
 % hue H
-if ~exist('Hmax','var') || isempty(Hmax)
+if ~exist('Hmax','var') || isempty(Hmax) && (~exist('Hrange','var') || isempty(Hrange))
     Hmax = 2*pi; % 1.5*pi
 end
-if ~exist('Hshift','var') || isempty(Hshift)
+if ~exist('Hshift','var') || isempty(Hshift) && (~exist('Hrange','var') || isempty(Hrange))
     Hshift = 0; % pi/8
 end
 if ~exist('Hrange','var') || isempty(Hrange)
@@ -61,6 +62,24 @@ L = interp1(CLvarLim,Lrange,CLvar);
 
 % Convert to RGB color space
 RGB = colorspace('LCH->RGB',cat(3,L,C,H));
+
+
+% Make bivariate colorbar image
+if nargout > 3
+    % nGrid = 2^7;
+    % clvar_cmap = linspace(CLvarLim(1), CLvarLim(2), nGrid);
+    % hvar_cmap  = linspace(HvarLim(1) , HvarLim(2) , nGrid);
+    % [CLvar_cmap, Hvar_cmap] = meshgrid(clvar_cmap, hvar_cmap);
+    [RGB_cmap, Hvar_cmap, CLvar_cmap] = colormap_bivariateBlackToSpectral([],[],HvarLim,CLvarLim,[],[],Hrange,Crange,Lrange,cbFlag);
+    hvar_cmap  = Hvar_cmap(:,1);
+    clvar_cmap = CLvar_cmap(1,:);
+    cbFlag = false;
+else
+    RGB_cmap   = [];
+    hvar_cmap  = [];
+    clvar_cmap = [];
+end
+
 
 
 % Plot colormap
