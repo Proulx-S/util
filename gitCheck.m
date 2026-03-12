@@ -1,6 +1,10 @@
-function gitCheck(folder)
+function [cmdLog, statusMsg] = gitCheck(folder, cmdLog)
     % Check if a git repository is in sync with its remote
     % Only checks status, does not perform any syncing operations
+    % cmdLog: optional cell array of git commands run (appended to, returned)
+    % statusMsg: message to repeat at end (e.g. 'Repository is in sync with remote.')
+    if nargin < 2; cmdLog = {}; end
+    statusMsg = '';
     
     % Save current backtrace state and turn off for this function
     oldState = warning('query', 'backtrace');
@@ -17,7 +21,9 @@ function gitCheck(folder)
     % Fetch latest changes from remote
     % Use GIT_TERMINAL_PROMPT=0 to prevent hanging on credential prompts
     % Redirect stderr to capture errors and prevent hanging
-    [status, output] = system(['cd ' folder ' && GIT_TERMINAL_PROMPT=0 git fetch origin 2>&1']);
+    fetchCmd = ['cd ' folder ' && GIT_TERMINAL_PROMPT=0 git fetch origin 2>&1'];
+    cmdLog{end+1} = 'GIT_TERMINAL_PROMPT=0 git fetch origin';
+    [status, output] = system(fetchCmd);
     if status ~= 0
         % Check if it's a credential/auth error (common when run from MATLAB)
         if contains(output, 'Username') || contains(output, 'credential') || contains(output, 'authentication')
@@ -33,7 +39,9 @@ function gitCheck(folder)
     end
     
     % Get current branch name
-    [status, branchName] = system(['cd ' folder ' && git rev-parse --abbrev-ref HEAD']);
+    revParseCmd = ['cd ' folder ' && git rev-parse --abbrev-ref HEAD'];
+    cmdLog{end+1} = 'git rev-parse --abbrev-ref HEAD';
+    [status, branchName] = system(revParseCmd);
     if status ~= 0
         warning('Failed to get current branch name');
         return;
@@ -42,27 +50,84 @@ function gitCheck(folder)
     branchName = strtrim(branchName);
     
     % Check if branch tracks a remote branch
-    [status, trackingBranch] = system(['cd ' folder ' && git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo ""']);
+    trackCmd = ['cd ' folder ' && git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo ""'];
+    cmdLog{end+1} = 'git rev-parse --abbrev-ref --symbolic-full-name @{u}';
+    [status, trackingBranch] = system(trackCmd);
     if status == 0
         trackingBranch = strtrim(trackingBranch);
         if ~isempty(trackingBranch)
-            % Compare local vs remote tracking branch
-            [status, result] = system(['cd ' folder ' && git rev-list --count HEAD..@{u} 2>/dev/null || echo 0']);
+            % Log resolved form for copy-paste (no @{u})
+            cmdLog{end} = ['git rev-parse --abbrev-ref --symbolic-full-name ' trackingBranch];
+            % Quote ref for shell in case branch name has special characters
+            tr = ['''' strrep(trackingBranch, '''', '''\''') ''''];
+            countCmd = ['cd ' folder ' && git rev-list --count HEAD..' tr ' 2>/dev/null || echo 0'];
+            cmdLog{end+1} = ['git rev-list --count HEAD..' trackingBranch];
+            [status, result] = system(countCmd);
+            if status == 0
+                commitsBehind = str2double(strtrim(result));
+                aheadCmd = ['cd ' folder ' && git rev-list --count ' tr '..HEAD 2>/dev/null || echo 0'];
+                cmdLog{end+1} = ['git rev-list --count ' trackingBranch '..HEAD'];
+                [stA, resA] = system(aheadCmd);
+                commitsAhead = (stA == 0) * str2double(strtrim(resA));
+            end
         else
-            % No tracking branch, try origin/HEAD or origin/main/master
-            [status, result] = system(['cd ' folder ' && git rev-list --count HEAD..origin/' branchName ' 2>/dev/null || git rev-list --count HEAD..origin/HEAD 2>/dev/null || echo 0']);
+            % No tracking branch: try origin/<branch> first (branch may exist on remote), else origin/HEAD
+            originBranch = ['origin/' branchName];
+            ob = ['''' strrep(originBranch, '''', '''\''') ''''];
+            countCmd = ['cd ' folder ' && git rev-list --count HEAD..' ob ' 2>/dev/null || git rev-list --count HEAD..origin/HEAD 2>/dev/null || echo 0'];
+            cmdLog{end+1} = ['git rev-list --count HEAD..' originBranch ' (or origin/HEAD)'];
+            [status, result] = system(countCmd);
+            if status == 0
+                commitsBehind = str2double(strtrim(result));
+                aheadCmd = ['cd ' folder ' && git rev-list --count ' ob '..HEAD 2>/dev/null || git rev-list --count origin/HEAD..HEAD 2>/dev/null || echo 0'];
+                cmdLog{end+1} = ['git rev-list --count ' originBranch '..HEAD (or origin/HEAD..HEAD)'];
+                [stA, resA] = system(aheadCmd);
+                commitsAhead = (stA == 0) * str2double(strtrim(resA));
+            end
         end
     else
         % Fallback: try origin/HEAD
-        [status, result] = system(['cd ' folder ' && git rev-list --count HEAD..origin/HEAD 2>/dev/null || echo 0']);
+        countCmd = ['cd ' folder ' && git rev-list --count HEAD..origin/HEAD 2>/dev/null || echo 0'];
+        cmdLog{end+1} = 'git rev-list --count HEAD..origin/HEAD';
+        [status, result] = system(countCmd);
+        if status == 0
+            commitsBehind = str2double(strtrim(result));
+            aheadCmd = ['cd ' folder ' && git rev-list --count origin/HEAD..HEAD 2>/dev/null || echo 0'];
+            cmdLog{end+1} = 'git rev-list --count origin/HEAD..HEAD';
+            [stA, resA] = system(aheadCmd);
+            commitsAhead = (stA == 0) * str2double(strtrim(resA));
+        end
     end
     
     if status == 0
-        commitsBehind = str2double(strtrim(result));
+        if ~exist('commitsAhead', 'var'); commitsAhead = 0; end
+        if ~exist('commitsBehind', 'var'); commitsBehind = 0; end
+        % If we're about to show "in sync" but branch exists on remote, recheck ahead using origin/branchName
+        if commitsBehind == 0 && commitsAhead == 0
+            originBranch = ['origin/' branchName];
+            ob = ['''' strrep(originBranch, '''', '''\''') ''''];
+            recheckCmd = ['cd ' folder ' && git rev-list --count ' ob '..HEAD 2>/dev/null'];
+            [stR, resR] = system(recheckCmd);
+            if stR == 0
+                n = str2double(strtrim(resR));
+                if ~isnan(n) && n > 0
+                    commitsAhead = n;
+                end
+            end
+        end
+        [~, repoName] = fileparts(folder);
+        prefix = [repoName '\' branchName ': '];
         if commitsBehind > 0
-            disp(['Repository is ' num2str(commitsBehind) ' commit(s) behind remote.']);
+            statusMsg = ['!!! ' prefix num2str(commitsBehind) ' commit(s) behind remote. !!!'];
+            disp('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+            disp(statusMsg);
+            disp('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+        elseif commitsAhead > 0
+            statusMsg = [prefix num2str(commitsAhead) ' commit(s) ahead of remote.'];
+            disp(statusMsg);
         else
-            disp('Repository is up to date with remote.');
+            statusMsg = [prefix 'in sync with remote.'];
+            disp(statusMsg);
         end
     end
 end
