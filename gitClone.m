@@ -12,6 +12,7 @@ function gitClone(url, folder, repoSubDir, branch)
     disp([newline '--------------------------------']);
     cmdLog = {};
     statusMsg = '';
+    uncommittedMsg = '';
     if exist(fullfile(folder,repoSubDir), 'dir')
         disp([url ' ' repoSubDir newline 'already downloaded to:' newline ' ' folder]);
         
@@ -33,7 +34,7 @@ function gitClone(url, folder, repoSubDir, branch)
             end
         end
         % Check repository sync status
-        [cmdLog, statusMsg] = gitCheck(folder, cmdLog);
+        [cmdLog, statusMsg, uncommittedMsg] = gitCheck(folder, cmdLog);
         
     else
         if isempty(repoSubDir)
@@ -70,5 +71,8 @@ function gitClone(url, folder, repoSubDir, branch)
     % Repeat repository status at the end
     if ~isempty(statusMsg)
         disp(statusMsg);
+    end
+    if ~isempty(uncommittedMsg)
+        disp(uncommittedMsg);
     end
     

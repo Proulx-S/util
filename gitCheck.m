@@ -1,10 +1,12 @@
-function [cmdLog, statusMsg] = gitCheck(folder, cmdLog)
+function [cmdLog, statusMsg, uncommittedMsg] = gitCheck(folder, cmdLog)
     % Check if a git repository is in sync with its remote
     % Only checks status, does not perform any syncing operations
     % cmdLog: optional cell array of git commands run (appended to, returned)
-    % statusMsg: message to repeat at end (e.g. 'Repository is in sync with remote.')
+    % statusMsg: message to repeat at end (e.g. 'util\main: in sync with remote.')
+    % uncommittedMsg: subtle warning when there are uncommitted changes (or '')
     if nargin < 2; cmdLog = {}; end
     statusMsg = '';
+    uncommittedMsg = '';
     
     % Save current backtrace state and turn off for this function
     oldState = warning('query', 'backtrace');
@@ -128,6 +130,11 @@ function [cmdLog, statusMsg] = gitCheck(folder, cmdLog)
         else
             statusMsg = [prefix 'in sync with remote.'];
             disp(statusMsg);
+        end
+        % Subtle warning when there are uncommitted local changes
+        [stU, outU] = system(['cd ' folder ' && git status --porcelain']);
+        if stU == 0 && ~isempty(strtrim(outU))
+            uncommittedMsg = '  (uncommitted local changes)';
         end
     end
 end
