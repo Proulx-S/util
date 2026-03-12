@@ -120,10 +120,8 @@ function [cmdLog, statusMsg, uncommittedMsg] = gitCheck(folder, cmdLog)
         [~, repoName] = fileparts(folder);
         prefix = [repoName '\' branchName ': '];
         if commitsBehind > 0
-            statusMsg = ['!!! ' prefix num2str(commitsBehind) ' commit(s) behind remote. !!!'];
-            disp('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+            statusMsg = ['!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!' newline '!!! ' prefix num2str(commitsBehind) ' commit(s) behind remote. !!!' newline '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'];
             disp(statusMsg);
-            disp('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
         elseif commitsAhead > 0
             statusMsg = [prefix num2str(commitsAhead) ' commit(s) ahead of remote.'];
             disp(statusMsg);
