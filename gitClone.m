@@ -1,4 +1,8 @@
 function gitClone(url, folder, repoSubDir, branch)
+    % Clone or ensure repo at folder is present and (optionally) on given branch.
+    % Remote is always origin. User specifies the local branch name (e.g. main);
+    % it is always synced with origin/<same name> (e.g. origin/main).
+    % If branch is empty or omitted, defaults to the remote default branch (e.g. main).
     if ~exist('repoSubDir', 'var'); repoSubDir = []; end
     if ~exist('branch', 'var'); branch = []; end
     branch = char(branch);
@@ -11,28 +15,66 @@ function gitClone(url, folder, repoSubDir, branch)
     disp([newline '--------------------------------']);
     cmdLog = {};
     statusMsg = '';
+    uncommittedMsg = '';
+    switchedToDefaultMsg = '';
     if exist(fullfile(folder,repoSubDir), 'dir')
         disp([url ' ' repoSubDir newline 'already downloaded to:' newline ' ' folder]);
         
-        % Optionally switch to requested branch and update
-        if ~isempty(branch)
-            fetchCmd = ['cd ' folder ' && GIT_TERMINAL_PROMPT=0 git fetch origin 2>&1'];
-            cmdLog{end+1} = 'GIT_TERMINAL_PROMPT=0 git fetch origin';
-            [st, out] = system(fetchCmd);
-            if st == 0
+        % Fetch so we have up-to-date refs (and origin/HEAD for default branch)
+        fetchCmd = ['cd ' folder ' && GIT_TERMINAL_PROMPT=0 git fetch origin 2>&1'];
+        cmdLog{end+1} = 'GIT_TERMINAL_PROMPT=0 git fetch origin';
+        [st, out] = system(fetchCmd);
+        if st == 0
+            branchWasUnspecified = false;
+            % Default to remote default branch when branch not specified
+            if isempty(branch)
+                [stD, defaultBranch] = system(['cd ' folder ' && git rev-parse --abbrev-ref origin/HEAD 2>/dev/null']);
+                if stD == 0
+                    defaultBranch = strtrim(defaultBranch);
+                    % Use local branch name only (strip origin/ so we don't checkout remote ref → detached HEAD)
+                    defaultBranch = strrep(defaultBranch, 'origin/', '');
+                    if ~isempty(defaultBranch)
+                        branch = defaultBranch;
+                        branchWasUnspecified = true;
+                    end
+                end
+            end
+            if ~isempty(branch)
                 revCmd = ['cd ' folder ' && git rev-parse --abbrev-ref HEAD'];
                 cmdLog{end+1} = 'git rev-parse --abbrev-ref HEAD';
                 [st, cur] = system(revCmd);
                 cur = strtrim(cur);
                 if st == 0 && ~strcmp(cur, branch)
-                    coCmd = ['cd ' folder ' && git checkout ' branch ' 2>&1'];
-                    cmdLog{end+1} = ['git checkout ' branch];
-                    system(coCmd);
+                    % Branch exists locally: switch. Else origin/branch exists: checkout (creates local tracking).
+                    % Else create new local branch (user asked for a branch that doesn't exist on remote).
+                    bq = ['''' strrep(branch, '''', '''\''') ''''];
+                    refHead = ['''' 'refs/heads/' strrep(branch, '''', '''\''') ''''];
+                    refOrigin = ['''' 'origin/' strrep(branch, '''', '''\''') ''''];
+                    [stLocal, ~] = system(['cd ' folder ' && git rev-parse --verify ' refHead ' 2>/dev/null']);
+                    [stOrigin, ~] = system(['cd ' folder ' && git rev-parse --verify ' refOrigin ' 2>/dev/null']);
+                    if stLocal == 0
+                        coCmd = ['cd ' folder ' && git checkout ' bq ' 2>&1'];
+                        cmdLog{end+1} = ['git checkout ' branch];
+                        system(coCmd);
+                    elseif stOrigin == 0
+                        coCmd = ['cd ' folder ' && git checkout ' bq ' 2>&1'];
+                        cmdLog{end+1} = ['git checkout ' branch];
+                        system(coCmd);
+                    else
+                        coCmd = ['cd ' folder ' && git checkout -b ' bq ' 2>&1'];
+                        cmdLog{end+1} = ['git checkout -b ' branch];
+                        system(coCmd);
+                    end
+                    if branchWasUnspecified
+                        [~, repoName] = fileparts(folder);
+                        switchedToDefaultMsg = ['!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!' newline '!!! Switched to remote default branch ''' branch ''' (' repoName '). !!!' newline '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'];
+                        disp(switchedToDefaultMsg);
+                    end
                 end
             end
         end
         % Check repository sync status
-        [cmdLog, statusMsg] = gitCheck(folder, cmdLog);
+        [cmdLog, statusMsg, uncommittedMsg] = gitCheck(folder, cmdLog);
         
     else
         if isempty(repoSubDir)
@@ -69,5 +111,11 @@ function gitClone(url, folder, repoSubDir, branch)
     % Repeat repository status at the end
     if ~isempty(statusMsg)
         disp(statusMsg);
+    end
+    if ~isempty(uncommittedMsg)
+        disp(uncommittedMsg);
+    end
+    if ~isempty(switchedToDefaultMsg)
+        disp(switchedToDefaultMsg);
     end
     

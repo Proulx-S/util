@@ -1,10 +1,14 @@
-function [cmdLog, statusMsg] = gitCheck(folder, cmdLog)
-    % Check if a git repository is in sync with its remote
-    % Only checks status, does not perform any syncing operations
+function [cmdLog, statusMsg, uncommittedMsg] = gitCheck(folder, cmdLog)
+    % Check if a git repository is in sync with its remote.
+    % Assumes remote is always origin. Current local branch (e.g. main) is always
+    % compared to origin/<same name> (e.g. origin/main). Only checks status; no syncing.
+    %
     % cmdLog: optional cell array of git commands run (appended to, returned)
-    % statusMsg: message to repeat at end (e.g. 'Repository is in sync with remote.')
+    % statusMsg: message to repeat at end (e.g. 'util\main: in sync with remote.')
+    % uncommittedMsg: subtle warning when there are uncommitted changes (or '')
     if nargin < 2; cmdLog = {}; end
     statusMsg = '';
+    uncommittedMsg = '';
     
     % Save current backtrace state and turn off for this function
     oldState = warning('query', 'backtrace');
@@ -49,51 +53,21 @@ function [cmdLog, statusMsg] = gitCheck(folder, cmdLog)
     
     branchName = strtrim(branchName);
     
-    % Check if branch tracks a remote branch
-    trackCmd = ['cd ' folder ' && git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo ""'];
-    cmdLog{end+1} = 'git rev-parse --abbrev-ref --symbolic-full-name @{u}';
-    [status, trackingBranch] = system(trackCmd);
-    if status == 0
-        trackingBranch = strtrim(trackingBranch);
-        if ~isempty(trackingBranch)
-            % Log resolved form for copy-paste (no @{u})
-            cmdLog{end} = ['git rev-parse --abbrev-ref --symbolic-full-name ' trackingBranch];
-            % Quote ref for shell in case branch name has special characters
-            tr = ['''' strrep(trackingBranch, '''', '''\''') ''''];
-            countCmd = ['cd ' folder ' && git rev-list --count HEAD..' tr ' 2>/dev/null || echo 0'];
-            cmdLog{end+1} = ['git rev-list --count HEAD..' trackingBranch];
-            [status, result] = system(countCmd);
-            if status == 0
-                commitsBehind = str2double(strtrim(result));
-                aheadCmd = ['cd ' folder ' && git rev-list --count ' tr '..HEAD 2>/dev/null || echo 0'];
-                cmdLog{end+1} = ['git rev-list --count ' trackingBranch '..HEAD'];
-                [stA, resA] = system(aheadCmd);
-                commitsAhead = (stA == 0) * str2double(strtrim(resA));
-            end
-        else
-            % No tracking branch: try origin/<branch> first (branch may exist on remote), else origin/HEAD
-            originBranch = ['origin/' branchName];
-            ob = ['''' strrep(originBranch, '''', '''\''') ''''];
-            countCmd = ['cd ' folder ' && git rev-list --count HEAD..' ob ' 2>/dev/null || git rev-list --count HEAD..origin/HEAD 2>/dev/null || echo 0'];
-            cmdLog{end+1} = ['git rev-list --count HEAD..' originBranch ' (or origin/HEAD)'];
-            [status, result] = system(countCmd);
-            if status == 0
-                commitsBehind = str2double(strtrim(result));
-                aheadCmd = ['cd ' folder ' && git rev-list --count ' ob '..HEAD 2>/dev/null || git rev-list --count origin/HEAD..HEAD 2>/dev/null || echo 0'];
-                cmdLog{end+1} = ['git rev-list --count ' originBranch '..HEAD (or origin/HEAD..HEAD)'];
-                [stA, resA] = system(aheadCmd);
-                commitsAhead = (stA == 0) * str2double(strtrim(resA));
-            end
-        end
-    else
-        % Fallback: try origin/HEAD
-        countCmd = ['cd ' folder ' && git rev-list --count HEAD..origin/HEAD 2>/dev/null || echo 0'];
-        cmdLog{end+1} = 'git rev-list --count HEAD..origin/HEAD';
+    % Remote is always origin. Compare local branch to origin/<same name>.
+    originBranch = ['origin/' branchName];
+    ob = ['''' strrep(originBranch, '''', '''\''') ''''];
+    [stRemote, ~] = system(['cd ' folder ' && git rev-parse --verify ' ob ' 2>/dev/null']);
+    branchIsLocalOnly = (stRemote ~= 0);
+    
+    if ~branchIsLocalOnly
+        % origin/branchName exists: behind = HEAD..origin/branchName, ahead = origin/branchName..HEAD
+        countCmd = ['cd ' folder ' && git rev-list --count HEAD..' ob ' 2>/dev/null || echo 0'];
+        cmdLog{end+1} = ['git rev-list --count HEAD..' originBranch];
         [status, result] = system(countCmd);
         if status == 0
             commitsBehind = str2double(strtrim(result));
-            aheadCmd = ['cd ' folder ' && git rev-list --count origin/HEAD..HEAD 2>/dev/null || echo 0'];
-            cmdLog{end+1} = 'git rev-list --count origin/HEAD..HEAD';
+            aheadCmd = ['cd ' folder ' && git rev-list --count ' ob '..HEAD 2>/dev/null || echo 0'];
+            cmdLog{end+1} = ['git rev-list --count ' originBranch '..HEAD'];
             [stA, resA] = system(aheadCmd);
             commitsAhead = (stA == 0) * str2double(strtrim(resA));
         end
@@ -102,32 +76,25 @@ function [cmdLog, statusMsg] = gitCheck(folder, cmdLog)
     if status == 0
         if ~exist('commitsAhead', 'var'); commitsAhead = 0; end
         if ~exist('commitsBehind', 'var'); commitsBehind = 0; end
-        % If we're about to show "in sync" but branch exists on remote, recheck ahead using origin/branchName
-        if commitsBehind == 0 && commitsAhead == 0
-            originBranch = ['origin/' branchName];
-            ob = ['''' strrep(originBranch, '''', '''\''') ''''];
-            recheckCmd = ['cd ' folder ' && git rev-list --count ' ob '..HEAD 2>/dev/null'];
-            [stR, resR] = system(recheckCmd);
-            if stR == 0
-                n = str2double(strtrim(resR));
-                if ~isnan(n) && n > 0
-                    commitsAhead = n;
-                end
-            end
-        end
         [~, repoName] = fileparts(folder);
         prefix = [repoName '\' branchName ': '];
         if commitsBehind > 0
-            statusMsg = ['!!! ' prefix num2str(commitsBehind) ' commit(s) behind remote. !!!'];
-            disp('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+            statusMsg = ['!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!' newline '!!! ' prefix num2str(commitsBehind) ' commit(s) behind remote. !!!' newline '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'];
             disp(statusMsg);
-            disp('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
         elseif commitsAhead > 0
             statusMsg = [prefix num2str(commitsAhead) ' commit(s) ahead of remote.'];
+            disp(statusMsg);
+        elseif branchIsLocalOnly
+            statusMsg = ['  >>> ' prefix 'local only — remember to publish for remote backup.'];
             disp(statusMsg);
         else
             statusMsg = [prefix 'in sync with remote.'];
             disp(statusMsg);
+        end
+        % Subtle warning when there are uncommitted local changes
+        [stU, outU] = system(['cd ' folder ' && git status --porcelain']);
+        if stU == 0 && ~isempty(strtrim(outU))
+            uncommittedMsg = '  (uncommitted local changes)';
         end
     end
 end
