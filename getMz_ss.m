@@ -33,7 +33,7 @@ end
 % Stationary spins (vel=0)
 Mz_ss = Mo * (1 - pMri.E1) / (1 - pMri.Q1);
 
-if nargout>2
+if nargout>2  ||  ( exist('vel','var') && ~isempty(vel) )
     % Moving spins (Bianciardi et al. 2016)    
     if exist('vel','var') && ~isempty(vel)
         vel = abs(vel);
