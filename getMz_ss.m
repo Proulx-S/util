@@ -34,8 +34,10 @@ end
 Mz_ss = Mo * (1 - pMri.E1) / (1 - pMri.Q1);
 
 if nargout>2
-    % Moving spins (Bianciardi et al. 2016)
+    % Moving spins (Bianciardi et al. 2016)    
     if exist('vel','var') && ~isempty(vel)
+        vel = abs(vel);
+
         pMri.vCrit  = pMri.sliceThickness / pMri.TR  /10; % [cm/s]
         regime = ones(size(vel));
         regime(vel==0    ) = 1; % regime 1: stationary spins
