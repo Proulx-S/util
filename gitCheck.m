@@ -31,8 +31,12 @@ function [cmdLog, statusMsg, uncommittedMsg] = gitCheck(folder, cmdLog)
     if status ~= 0
         % Check if it's a credential/auth error (common when run from MATLAB)
         if contains(output, 'Username') || contains(output, 'credential') || contains(output, 'authentication')
-            warning('Git fetch skipped: authentication required (run manually if needed)');
-            warning('could not make sure repository is up to date');
+            warning('Git fetch skipped: authentication required (could not verify repository is up to date).');
+            fprintf(['  To update manually, open a terminal (outside MATLAB) and run:\n' ...
+                '    cd %s\n' ...
+                '    git fetch origin\n' ...
+                '  You may be prompted for your GitHub username and password or token.\n' ...
+                '  If you use two-factor authentication, use a personal access token instead of your password.\n'], folder);
         elseif contains(output, 'Could not resolve host') || contains(output, 'Name or service not known') || contains(output, 'network')
             warning('Git fetch skipped: network connectivity issue (host unreachable)');
             warning('Repository sync check skipped due to network error. Will retry on next check.');

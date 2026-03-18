@@ -3,6 +3,11 @@ function gitClone(url, folder, repoSubDir, branch)
     % Remote is always origin. User specifies the local branch name (e.g. main);
     % it is always synced with origin/<same name> (e.g. origin/main).
     % If branch is empty or omitted, defaults to the remote default branch (e.g. main).
+    %
+    % If you see "authentication required": run in a terminal (outside MATLAB):
+    %   cd <repo_folder>
+    %   git fetch origin
+    % You may be prompted for credentials; use a personal access token if 2FA is enabled.
     if ~exist('repoSubDir', 'var'); repoSubDir = []; end
     if ~exist('branch', 'var'); branch = []; end
     branch = char(branch);
