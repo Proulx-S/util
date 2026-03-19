@@ -641,14 +641,22 @@ function [mdh_blob, filePos, isEOF] = loop_mdh_read( fid, version, Nscans, scan,
     if isOctave % octave does not support a cancel button
         if shouldShowGUI
             h = waitbar(0,'','Name', sprintf('Reading Scan ID %d/%d', scan, Nscans));
+        else
+            h = waitbar(0,'','Name', sprintf('Reading Scan ID %d/%d', scan, Nscans),...
+                'Visible','off');
         end
     else
         if shouldShowGUI
             h = waitbar(0,'','Name', sprintf('Reading Scan ID %d/%d', scan, Nscans),...
                     'CreateCancelBtn',...
                     'setappdata(gcbf,''canceling'',1)');
-            setappdata(h,'canceling',0)
+        else
+            h = waitbar(0,'','Name', sprintf('Reading Scan ID %d/%d', scan, Nscans),...
+                'CreateCancelBtn',...
+                'setappdata(gcbf,''canceling'',1)',...
+                'Visible','off');
         end
+        setappdata(h,'canceling',0)
     end
 
     t0 = tic;
@@ -736,7 +744,9 @@ function [mdh_blob, filePos, isEOF] = loop_mdh_read( fid, version, Nscans, scan,
 
         cPos = cPos + ulDMALength;
     end % while true
-    delete(h);
+    if shouldShowGUI
+        delete(h);
+    end
     
     if isEOF
         n_acq = n_acq-1;    % ignore the last attempt
