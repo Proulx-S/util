@@ -48,7 +48,7 @@ if nargout>2  ||  ( exist('vel','var') && ~isempty(vel) )
         Mz_ss            = nan(size(vel));
         Mz_ss(regime==1) = Mz_ss_v0;
         % regime 2
-        u = pMri.vCrit ./ vel(regime==2);
+        u = ceil(pMri.vCrit ./ vel(regime==2)); % reflects number of RF seen by a spin
         Mz_ss(regime==2) = Mz_ss_v0 + (Mo-Mz_ss_v0) .* (1 - pMri.Q1.^u)  ./  (u.*(1-pMri.Q1));
                         % %possible AI-proposed simplification...
                         % fMax = 1 / Mz_ss_v0;
