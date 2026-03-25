@@ -5,6 +5,7 @@ function [venc, m1, vel, Ns, vencMin, vencMax] = getFVE(FVEres, FVEbw, method)
     % m1     : [T*s^2/m] gradient first moments
     % Nvenc  :           number of velocity encodings
     % Fvenc  : [cm/s]    velocity spectrum "frequency" axis
+    if ~exist('method', 'var') || isempty(method) ; method = 'FVEbipo'; end
 
     switch method
         case 'FVEmono'
