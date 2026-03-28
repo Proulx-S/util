@@ -1,4 +1,4 @@
-function [Mz_ss,pMri,Mz_ss_v0,Mz_ss_max,Mo] = getMz_ss(pMri,pRelax,vel,Mo)
+function [Mz_ss,pMri,Mz_ss_v0,Mz_ss_max,Mo,vel] = getMz_ss(pMri,pRelax,vel,Mo)
 % getMz_ss.m  Steady-state longitudinal magnetization for GRE/FLASH (Bianciardi et al. 2016 for moving spins).
 %
 % INPUTS
@@ -34,6 +34,12 @@ end
 Mz_ss = Mo * (1 - pMri.E1) / (1 - pMri.Q1);
 
 if nargout>2  ||  ( exist('vel','var') && ~isempty(vel) )
+    if ~exist('vel','var') || isempty(vel)
+        if ~isfield(pMri,'vCrit') || isempty(pMri.vCrit)
+            pMri.vCrit = 0.1.*pMri.sliceThickness./pMri.TR;
+        end
+        vel = linspace(0, pMri.vCrit+40*pMri.vCrit/32, 34);
+    end
     % Moving spins (Bianciardi et al. 2016)    
     if exist('vel','var') && ~isempty(vel)
         vel = abs(vel);
