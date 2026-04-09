@@ -9,7 +9,7 @@ function phase = vel2phase(v, venc)
         venc = permute(venc, permIdx);
     end
         
-    gamma = 42.577e6;  % Gyromagnetic ratio for 1H [Hz/T]
+    gamma = 2.6752218708e8/(2*pi);  % Gyromagnetic ratio/(2*pi) for 1H [Hz/T]
     M1    = pi ./ (gamma .* venc./ 100);  % first moment ofvelocity encoding gradient [T*s^2/m]
     phase = gamma .* M1 .* v./100; % velocity encoded phase [rad]
 end
