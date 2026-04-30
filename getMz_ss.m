@@ -33,7 +33,7 @@ end
 % Stationary spins (vel=0)
 Mz_ss = Mo * (1 - pMri.E1) / (1 - pMri.Q1);
 
-pMri.vCrit = 0.1.*pMri.sliceThickness./pMri.TR;
+pMri.vCrit = 0.1.*pMri.sliceThickness./pMri.TR; % cm/s
 if nargout>2  ||  ( exist('vel','var') && ~isempty(vel) )
     if ~exist('vel','var') || isempty(vel)
         u   = flip(2:2^10); % number of RF seen by a spin
