@@ -7,8 +7,9 @@ if ~exist('plotFlag','var') || isempty(plotFlag); plotFlag = false; end
 
 % Loop through cell array of datasets d
 if iscell(d)
+    prob = cell(size(d));
     for dIdx = 1:length(d)
-        prob(dIdx) = credibleMean2d(d{dIdx},alpha,nBoot);
+        prob{dIdx} = credibleMean2d(d{dIdx},alpha,nBoot);
     end
     return
 end
