@@ -39,6 +39,7 @@ classdef runCond
       trExc
       nDummy        % [run x 1]
       nDummyRemoved % [run x 1]
+      tsStartTime   % [scalar s] time of the first preprocessed (dummy-removed) ts frame relative to the full (with-dummy) ts 0s start = (nFrameOrig-nFrame)*tr. dsgn.onsetList is in full-ts time, so account for this offset when aligning ts to onsets.
       dt            % [run x 1]
       vSize         % [run x dim]
       % Data [run x 1]
