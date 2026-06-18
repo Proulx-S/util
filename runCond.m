@@ -39,7 +39,7 @@ classdef runCond
       trExc
       nDummy        % [run x 1]
       nDummyRemoved % [run x 1]
-      tsStartTime   % [scalar s] time of the first preprocessed (dummy-removed) ts frame relative to the full (with-dummy) ts 0s start = (nFrameOrig-nFrame)*tr. dsgn.onsetList is in full-ts time, so account for this offset when aligning ts to onsets.
+      tsStartTime   % [scalar s] time of the first preprocessed (dummy-removed) ts frame in the stimulus clock = (nFrameOrig-nFrame)*tr. The stimulus clock t=0 is the MRI scanner trigger (sent to the stimulus computer at the START of one data point's acquisition); dsgn.onsetList/onDur are measured from it. Equivalent index form used by the analysis: triggerIdx = 1 - tsStartTime/dt (ts index of the t=0 data point; frame j sits at (j-triggerIdx)*dt). <=0 here, since lead-in frames acquired at/after t=0 were dropped.
       dt            % [run x 1]
       vSize         % [run x dim]
       % Data [run x 1]
