@@ -33,18 +33,16 @@ end
 % Stationary spins (vel=0)
 Mz_ss = Mo * (1 - pMri.E1) / (1 - pMri.Q1);
 
+pMri.vCrit = 0.1.*pMri.sliceThickness./pMri.TR; % cm/s
 if nargout>2  ||  ( exist('vel','var') && ~isempty(vel) )
     if ~exist('vel','var') || isempty(vel)
-        if ~isfield(pMri,'vCrit') || isempty(pMri.vCrit)
-            pMri.vCrit = 0.1.*pMri.sliceThickness./pMri.TR;
-        end
-        vel = linspace(0, pMri.vCrit+40*pMri.vCrit/32, 34);
+        u   = flip(2:2^10); % number of RF seen by a spin
+        vel = pMri.vCrit./[u 1 0.75];
     end
     % Moving spins (Bianciardi et al. 2016)    
     if exist('vel','var') && ~isempty(vel)
         vel = abs(vel);
 
-        pMri.vCrit  = pMri.sliceThickness / pMri.TR  /10; % [cm/s]
         regime = ones(size(vel));
         regime(vel==0    ) = 1; % regime 1: stationary spins
         regime(vel> 0    ) = 2; % regime 2: moving spins below critical velocity
@@ -54,7 +52,9 @@ if nargout>2  ||  ( exist('vel','var') && ~isempty(vel) )
         Mz_ss            = nan(size(vel));
         Mz_ss(regime==1) = Mz_ss_v0;
         % regime 2
-        u = ceil(pMri.vCrit ./ vel(regime==2)); % reflects number of RF seen by a spin
+        if ~exist('u','var')
+            u = ceil(pMri.vCrit ./ vel(regime==2)); % number of RF seen by a spin
+        end
         Mz_ss(regime==2) = Mz_ss_v0 + (Mo-Mz_ss_v0) .* (1 - pMri.Q1.^u)  ./  (u.*(1-pMri.Q1));
                         % %possible AI-proposed simplification...
                         % fMax = 1 / Mz_ss_v0;
