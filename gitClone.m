@@ -33,6 +33,11 @@ function gitClone(url, folder, repoSubDir, branch)
         branchWasUnspecified = false;
         % Default to remote default branch when branch not specified
         if isempty(branch)
+            % git fetch does NOT refresh origin/HEAD; re-resolve it so a changed remote
+            % default branch is picked up instead of the stale cached one (else a repo
+            % whose GitHub default moved, e.g. dev->main, gets switched back to the old branch).
+            cmdLog{end+1} = 'git remote set-head origin --auto';
+            system(['cd ' folder ' && GIT_TERMINAL_PROMPT=0 git remote set-head origin --auto 2>/dev/null']);
             [stD, defaultBranch] = system(['cd ' folder ' && git rev-parse --abbrev-ref origin/HEAD 2>/dev/null']);
             if stD == 0
                 defaultBranch = strtrim(defaultBranch);
