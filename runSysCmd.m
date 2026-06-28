@@ -43,7 +43,9 @@ if exist('outputFile','var') && ~isempty(outputFile)
     fprintf(fid, repmat('\n', 1, 5));
     fprintf(fid, '%s\n', cmdOut);
     fclose(fid);
-    disp(['command and terminal output logged to:' newline ' ' outputFile]);
+    if verbose
+        disp(['command and terminal output logged to:' newline ' ' outputFile]);
+    end
 end
 
 end
