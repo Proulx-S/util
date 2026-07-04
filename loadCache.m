@@ -8,6 +8,7 @@ function loadCache(level)
     end
     fprintf('loadCache(%g): loading -> %s\n', level, cacheFile);
     esc = strrep(cacheFile, '''', '''''');   % escape single quotes for the eval'd string
+    tLoad = tic;
     evalin('caller', sprintf('load(''%s'');', esc));
-    fprintf('loadCache(%g): loaded <- %s\n', level, cacheFile);
+    fprintf('loadCache(%g): loaded in %.2f s <- %s\n', level, toc(tLoad), cacheFile);
 end

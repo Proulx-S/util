@@ -10,5 +10,12 @@ function tf = checkCache(level)
     %   end
     %
     % Cache path == the caller's file with LEVEL appended (see cacheFileFor).
+    %
+    % Side effect: starts LEVEL's block stopwatch (see cacheTimer), so saveCache
+    % can report how long the guarded block took -- no tic/toc needed in the doIt.
+    % (With the `forceThis || checkCache` short-circuit this runs whenever
+    % forceThis is false; to also time forced recomputes, write `checkCache(1) ||
+    % forceThis` so checkCache is always evaluated.)
     tf = ~isfile(cacheFileFor(level));
+    cacheTimer(level, 'start');
 end
