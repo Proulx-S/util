@@ -19,6 +19,12 @@ function printFigs(figs, fNames, figDir, printIt)
 % with ContentType 'vector'; fig via savefig. exportgraphics captures the
 % figure's current colors, so for white-on-dark panels set dark groot defaults
 % before plotting (headless MATLAB has no interactive dark theme).
+%
+% A figure created with Visible='off' (e.g. to export unattended without popping a window) is
+% exported as-is -- png/svg/eps all print fine invisible, no need to force it on screen. A .fig
+% reloads with whatever Visible state it was saved in, though, so a CreateFcn is attached before
+% savefig (only when Visible is currently 'off') that turns it back on -- fires when the .fig is
+% later reopened (`open`/`openfig`), not now.
 
     if ~exist('printIt','var') || isempty(printIt); printIt = 1; end
     if ~printIt; return; end
@@ -42,11 +48,21 @@ function printFigs(figs, fNames, figDir, printIt)
 
     for k = 1:numel(figs)
         f = fullfile(figDir, fNames(k));
-        figure(figs(k)); drawnow; % force a full render before capture
+        exts = ".png";
+        drawnow;   % force a full render before capture (no figure(figs(k)) -- that would force Visible='on')
         exportgraphics(figs(k), f + ".png", 'Resolution', 300);
-        if printIt>=2; savefig(       figs(k), char(f + ".fig"));                   end
-        if printIt>=3; exportgraphics(figs(k), f + ".svg", 'ContentType', 'vector');
-                       exportgraphics(figs(k), f + ".eps", 'ContentType', 'vector'); end
+        if printIt>=2
+            if strcmp(get(figs(k),'Visible'),'off')
+                set(figs(k), 'CreateFcn', @(src,~) set(src,'Visible','on'));
+            end
+            savefig(figs(k), char(f + ".fig"));
+            exts = exts + ", .fig";
+        end
+        if printIt>=3
+            exportgraphics(figs(k), f + ".svg", 'ContentType', 'vector');
+            exportgraphics(figs(k), f + ".eps", 'ContentType', 'vector');
+            exts = exts + ", .svg, .eps";
+        end
+        disp("printFigs: wrote " + f + " [" + exts + "]")
     end
-    disp("printFigs: exported " + numel(figs) + " figure(s) to " + string(figDir))
 end
