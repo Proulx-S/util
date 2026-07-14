@@ -1,8 +1,13 @@
-function gitClone(url, folder, repoSubDir, branch)
+function gitClone(url, folder, repoSubDir, branch, allowWrite)
     % Clone or ensure repo at folder is present and (optionally) on given branch.
     % Remote is always origin. User specifies the local branch name (e.g. main);
     % it is always synced with origin/<same name> (e.g. origin/main).
     % If branch is empty or omitted, defaults to the remote default branch (e.g. main).
+    %
+    % folder is left read-only afterward (this is meant to be the shared canonical
+    % clone used across projects) unless allowWrite is true. To develop a tool
+    % locally instead, use getClone.m, which clones a detached, writable,
+    % project-tracked copy.
     %
     % If you see "authentication required": run in a terminal (outside MATLAB):
     %   cd <repo_folder>
@@ -10,6 +15,7 @@ function gitClone(url, folder, repoSubDir, branch)
     % You may be prompted for credentials; use a personal access token if 2FA is enabled.
     if ~exist('repoSubDir', 'var'); repoSubDir = []; end
     if ~exist('branch', 'var'); branch = []; end
+    if ~exist('allowWrite', 'var') || isempty(allowWrite); allowWrite = false; end
     branch = char(branch);
     if ~isempty(branch)
         branch = strtrim(branch);
@@ -24,7 +30,11 @@ function gitClone(url, folder, repoSubDir, branch)
     switchedToDefaultMsg = '';
     if exist(fullfile(folder,repoSubDir), 'dir')
         disp([url ' ' repoSubDir newline 'already downloaded to:' newline ' ' folder]);
-        
+
+        % A prior run may have left this read-only; restore write access before
+        % fetching/checking out.
+        system(['chmod -R u+w ' folder]);
+
         % Fetch so we have up-to-date refs (and origin/HEAD for default branch)
         fetchCmd = ['cd ' folder ' && GIT_TERMINAL_PROMPT=0 git fetch origin 2>&1'];
         cmdLog{end+1} = 'GIT_TERMINAL_PROMPT=0 git fetch origin';
@@ -109,6 +119,19 @@ function gitClone(url, folder, repoSubDir, branch)
     end
     addpath(genpath(fullfile(folder,repoSubDir)));
     disp(['added to path:' newline ' ' fullfile(folder,repoSubDir)]);
+    if ~allowWrite
+        system(['chmod -R a-w ' folder]);
+        disp([newline '--------------------------------' newline ...
+            'NOTE: ' folder ' is now read-only. It''s the shared canonical clone used' newline ...
+            'by every project -- edits here can be silently overwritten and can race' newline ...
+            'concurrent runs.' newline ...
+            'To develop this tool locally: use getClone.m instead (tracks a detached' newline ...
+            'copy in your project''s own repo). To write here anyway (not recommended):' newline ...
+            'call gitClone with allowWrite=true.' newline ...
+            '--------------------------------']);
+    else
+        disp('NOTE: read-only protection disabled for this call (allowWrite=true).');
+    end
     % Print git command history
     if ~isempty(cmdLog)
         disp([newline '--- Git commands run (history) ---']);
