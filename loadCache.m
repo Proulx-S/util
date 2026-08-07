@@ -1,14 +1,23 @@
 function loadCache(level)
-    % Restore the CALLER's workspace from the LEVEL cache file written by
-    % saveCache(level) (see cacheFileFor for the path). Every variable stored in
+    % Restore the CALLER's workspace from a cache file. Every variable stored in
     % the cache is loaded straight into the calling doIt's workspace.
-    cacheFile = cacheFileFor(level);
-    if ~isfile(cacheFile)
-        error('loadCache:missing', 'No level-%g cache to load: %s', level, cacheFile);
+    %
+    % LEVEL is either:
+    %   - numeric, resolved via cacheFileFor(level) to the calling doIt's
+    %     level-N cache file (the file written by saveCache(level)), or
+    %   - a string/char naming a cache .mat file directly -- e.g. one of the
+    %     paths returned by checkCache() -- loaded as-is, no caller resolution.
+    if ischar(level) || isstring(level)
+        cacheFile = char(level);
+    else
+        cacheFile = cacheFileFor(level);
     end
-    fprintf('loadCache(%g): loading -> %s\n', level, cacheFile);
+    if ~isfile(cacheFile)
+        error('loadCache:missing', 'No cache to load: %s', cacheFile);
+    end
+    fprintf('loadCache: loading -> %s\n', cacheFile);
     esc = strrep(cacheFile, '''', '''''');   % escape single quotes for the eval'd string
     tLoad = tic;
     evalin('caller', sprintf('load(''%s'');', esc));
-    fprintf('loadCache(%g): loaded in %.2f s <- %s\n', level, toc(tLoad), cacheFile);
+    fprintf('loadCache: loaded in %.2f s <- %s\n', toc(tLoad), cacheFile);
 end
