@@ -31,9 +31,27 @@ function [cmap, info] = colormap_divergingHue(hues, wNeutral, wTransition, lNeut
 %   lNeutral     lightness of the neutral zone, a 0..1 knob: 0 = black,
 %                1 = white, 0.5 = mid-gray. [] matches the inner-edge lightness,
 %                so leaving the dead-zone is a pure chroma onset.  (default [])
-%   cOuter       chroma at the OUTER extremes of the wings, a 0..1 knob:
-%                0 = white, 1 = the most saturated colour achievable by BOTH
-%                wings (common gamut max, so the wings stay symmetric).
+%                'trans' -- transition zones hold the wing's own colour FIXED and fade an ALPHA
+%                channel to 0 instead of blending towards grey (see colorDivergingHueLCH.m's own
+%                header for the exact behaviour and info.alpha below). NOT sweepable (a scalar char
+%                setting, unlike the numeric knob).
+%   cOuter       wing chroma knob(s), each a 0..1 value where 0 = white and 1 =
+%                that end's own most saturated colour achievable by BOTH wings
+%                (common gamut max, so the wings stay symmetric). SCALAR or a
+%                LENGTH-2 [cInner cOuter] PAIR (2026-09-02, Seb's own ask):
+%                  scalar v        -- the OUTER extremes only; the inner edges
+%                                     stay at full saturation. Same as [1 v] --
+%                                     the historical, and pre-2026-09-02 only,
+%                                     form.
+%                  [cInner cOuter] -- cInner scales the INNER edges (the colours
+%                                     flanking the dead zone), cOuter the OUTER
+%                                     extremes. cInner=1 is the max-ΔE pair the
+%                                     gamut search found, cInner=0 whitens the
+%                                     inner edges out completely.
+%                cInner<1 deliberately trades away some of the inner-edge
+%                perceptual separation this function is built around; the ΔE
+%                actually achieved is reported in info.innerDeltaE (and printed
+%                on every demo/sweep panel), so the cost is visible.
 %                                                                  (default 0.2)
 %   N            number of colours.                       (default 256)
 %   plotProfiles when true, also save a profile panel (colorbar + L*/C*/hue +
@@ -47,6 +65,18 @@ function [cmap, info] = colormap_divergingHue(hues, wNeutral, wTransition, lNeut
 %   itself is NOT sweepable), saves it to the working directory as
 %   colormap_divergingHue_sweep_<name>.png, and returns the colormap of the first
 %   swept value. Passing more than one vector errors.
+%     cOuter is the ONE EXCEPTION to "a vector means a sweep", because length 2
+%     is now its [cInner cOuter] pair (see above). Its rule is:
+%       scalar              -- single colormap, outer knob only.
+%       1x2 / 2x1           -- single colormap, the [cInner cOuter] PAIR. NOT a
+%                              2-value sweep (the one form whose meaning changed
+%                              on 2026-09-02).
+%       2xK matrix (K>=2)   -- sweep of K pairs, one [cInner; cOuter] per COLUMN.
+%                              This is also how to sweep exactly 2 outer knobs:
+%                              [1 1; 0.2 0.5].
+%       vector, length>=3   -- sweep of that many outer knobs, cInner=1 for all
+%                              (unchanged from before).
+%     Any other shape errors rather than guessing.
 %
 %   Caching. A plain single call saves its colormap to a .mat in the working
 %   directory named by its inputs (colormap_divergingHue_hA..._hB..._wN..._wTr..._lN...
@@ -54,7 +84,11 @@ function [cmap, info] = colormap_divergingHue(hues, wNeutral, wTransition, lNeut
 %   recomputing. When plotProfiles is set, the profile PNG shares that same
 %   input-keyed base name. Sweeps and the no-argument demo do NOT cache (they
 %   are one-off explorations), so they never litter the directory with .mat
-%   files.
+%   files. The cO field of that name stays bare (cO0p2) whenever cInner is 1 --
+%   including the explicit pair [1 0.2], which builds a colormap identical to the
+%   scalar 0.2 and so deliberately SHARES its cache entry -- and becomes
+%   cO<inner>to<outer> (cO0p6to0p2, mirroring the hue fields' own "to") only when
+%   cInner is actually in play. Pre-2026-09-02 .mat files therefore keep hitting.
 %
 %   NO-ARG CALL -- colormap_divergingHue() (zero arguments) does NOT return this function's own
 %   positional defaults -- it runs a "self-demo" instead (builds/saves a demo panel PNG, returns that
@@ -68,15 +102,18 @@ function [cmap, info] = colormap_divergingHue(hues, wNeutral, wTransition, lNeut
 %   edit them there if needed -- shared by both this function and colormap_blueNeutralRed.m.
 %
 %   info  struct: innerALCH, innerBLCH, outerALCH, outerBLCH [L C H]; innerL, innerDeltaE; flatEdges,
-%                 transEdges, wingWidth (data units); Lprofile, Cprofile, Hprofile; and the dE profiles
-%                 dEprofile (+v vs -v), dEcentreProfile, dEouterProfile. See colorDivergingHueLCH.m's
-%                 own header for the exact field meanings.
+%                 transEdges, wingWidth (data units); Lprofile, Cprofile, Hprofile; alpha; and the dE
+%                 profiles dEprofile (+v vs -v), dEcentreProfile, dEouterProfile. See
+%                 colorDivergingHueLCH.m's own header for the exact field meanings.
 %
 %   Design. See colorDivergingHueLCH.m's own header for the full design rationale (CIE LCH gamut
 %   search, why it avoids the naive-RGB-interpolation "Mach band" artifact, etc.) -- not restated here.
 %
 %   colormap_divergingHue({[80 140],[260 320]});                          % green/violet, defaults otherwise
 %   colormap_divergingHue({[80 140],[260 320]}, 0.4, 0.16, [], 0.2, 256);  % same, fully explicit (safe vs. the no-arg trap)
+%   colormap_divergingHue([], [], [], [], [0.6 0.2]);                      % inner edges pulled 40% towards white
+%   colormap_divergingHue([], [], [], [], [1 1; 0.2 0.5]);                 % 2-value cOuter sweep, cInner=1 (see Sweep mode)
+%   colormap_divergingHue([], [], [], [], [1 0.8 0.6 0.4; 0.2 0.2 0.2 0.2]); % sweep cInner alone, cOuter held at 0.2
 
 % ---- self-demo when called with no arguments ----------------------------
 if nargin == 0; [cmap, info] = localDemo(); return; end
@@ -99,12 +136,16 @@ assert(isscalar(N) && N >= 2, 'N must be a scalar >= 2.');
 % swept value.
 swNames = {'wNeutral','wTransition','lNeutral','cOuter'};
 swVals  = {wNeutral, wTransition, lNeutral, cOuter};
-isArr   = cellfun(@(v) numel(v) > 1, swVals);
+isArr   = cellfun(@(v) isnumeric(v) && numel(v) > 1, swVals);   % lNeutral='trans' (numel 5) is a
+                                                                 % scalar CHAR setting, never a sweep
+% cOuter needs its own rule: a length-2 vector is its [cInner cOuter] PAIR, not a 2-value sweep.
+[isArr(4), cOuterSwVals] = localCOuterSweep(cOuter);
 if any(isArr)
     assert(nnz(isArr) == 1, 'colormap_divergingHue: only one parameter may be an array at a time.');
-    vals = swVals{isArr};
-    assert(numel(vals) <= 16, 'colormap_divergingHue: a swept parameter may have at most 16 values.');
-    [cmap, info] = localSweep(swNames{isArr}, vals(:).', hues, wNeutral, wTransition, lNeutral, cOuter, N);
+    iSw = find(isArr);
+    if iSw == 4; vals = cOuterSwVals; else; vals = swVals{iSw}(:).'; end   % vals is 1xK, or 2xK for cOuter
+    assert(size(vals,2) <= 16, 'colormap_divergingHue: a swept parameter may have at most 16 values.');
+    [cmap, info] = localSweep(swNames{iSw}, vals, hues, wNeutral, wTransition, lNeutral, cOuter, N);
     return
 end
 
@@ -147,13 +188,14 @@ hues = {[250 300],[340 40]};
 N = 256;
 x = linspace(-1, 1, N);
 
-%          name, wNeutral, wTransition, lNeutral, cOuter
+%          name, wNeutral, wTransition, lNeutral, cOuter (scalar, or [cInner cOuter])
 exps = {
   'baseline',        0.20,        0.20,     0.50, 0.20
   'no flat, sharp',  0.00,        0.20,     0.50, 0.20
   'black neutral',   0.20,        0.20,     0.00, 0.20
   'white neutral',   0.20,        0.20,     1.00, 0.20
   'saturated wings', 0.20,        0.20,     0.50, 1.00
+  'pale inner',      0.20,        0.20,     0.50, [0.50 0.20]
   'wide flat+trans', 0.40,        0.40,     0.50, 0.20
 };
 ne = size(exps,1);
@@ -161,7 +203,7 @@ ne = size(exps,1);
 f = figure('MenuBar','none','ToolBar','none','Color','w','Visible','off', ...
            'Units','centimeters','Position',[0 0 5.5*ne 22]);
 try, f.Theme = 'light'; catch, end
-hT = tiledlayout(f, 5, ne, 'TileSpacing','compact','Padding','compact');
+hT = tiledlayout(f, 5, ne, 'TileSpacing','tight','Padding','tight');
 
 hLeg = gobjects(1,6);
 for k = 1:ne
@@ -169,7 +211,7 @@ for k = 1:ne
     [ck, ik] = colorDivergingHueLCH(hues, wN, wTr, lN, cO, N);
     if k == 1, cmap = ck; info = ik; end   % baseline is the function output
     ttl = {nm, sprintf('wN=%.2f wTr=%.2f', wN, wTr), ...
-           sprintf('lN=%.2f cO=%.2f', lN, cO), ...
+           sprintf('lN=%.2f cO=%s', lN, localFmtCOuter(cO)), ...
            sprintf('\\DeltaE=%.0f', ik.innerDeltaE)};
     hh = localPlotColumn(hT, k, ne, x, ck, ik, ttl);
     if k == 1, hLeg = hh; end
@@ -180,30 +222,34 @@ end
 
 % -----------------------------------------------------------------------
 function [cmap, info] = localSweep(name, vals, hues, wNeutral, wTransition, lNeutral, cOuter, N)
-% Demo-style panel sweeping a single parameter 'name' over 'vals' (length<=16), holding the others
-% (INCLUDING hues) fixed. Saves to the working directory; returns the first.
-ne = numel(vals);
+% Demo-style panel sweeping a single parameter 'name' over 'vals' (at most 16 values), holding the
+% others (INCLUDING hues) fixed. Saves to the working directory; returns the first.
+% vals is 1xK for the plain numeric knobs and 2xK for a cOuter pair sweep, so it is always indexed
+% COLUMN-wise below (vals(:,k) -- a scalar or a [cInner; cOuter] column).
+ne = size(vals,2);
 x  = linspace(-1, 1, N);
 f = figure('MenuBar','none','ToolBar','none','Color','w','Visible','off', ...
            'Units','centimeters','Position',[0 0 5.5*ne 22]);
 try, f.Theme = 'light'; catch, end
-hT = tiledlayout(f, 5, ne, 'TileSpacing','compact','Padding','compact');
+hT = tiledlayout(f, 5, ne, 'TileSpacing','tight','Padding','tight');
 
 hLeg = gobjects(1,6);
 for k = 1:ne
     wN = wNeutral; wTr = wTransition; lN = lNeutral; cO = cOuter;
+    v  = vals(:,k).';
     switch name
-        case 'wNeutral',    wN  = vals(k);
-        case 'wTransition', wTr = vals(k);
-        case 'lNeutral',    lN  = vals(k);
-        case 'cOuter',      cO  = vals(k);
+        case 'wNeutral',    wN  = v;
+        case 'wTransition', wTr = v;
+        case 'lNeutral',    lN  = v;
+        case 'cOuter',      cO  = v;   % 1x2 [cInner cOuter] for a pair sweep
     end
     [ck, ik] = colorDivergingHueLCH(hues, wN, wTr, lN, cO, N);
     if k == 1, cmap = ck; info = ik; end
     if isempty(lN); lNs = '[]'; else; lNs = sprintf('%.2f', lN); end
-    ttl = {sprintf('%s = %.4g', name, vals(k)), ...
+    if strcmp(name, 'cOuter'); vs = localFmtCOuter(v); else; vs = sprintf('%.4g', v); end
+    ttl = {sprintf('%s = %s', name, vs), ...
            sprintf('wN=%.2f wTr=%.2f', wN, wTr), ...
-           sprintf('lN=%s cO=%.2f', lNs, cO), ...
+           sprintf('lN=%s cO=%s', lNs, localFmtCOuter(cO)), ...
            sprintf('\\DeltaE=%.0f', ik.innerDeltaE)};
     hh = localPlotColumn(hT, k, ne, x, ck, ik, ttl);
     if k == 1, hLeg = hh; end
@@ -220,11 +266,17 @@ x = linspace(-1, 1, size(cmap,1));
 f = figure('MenuBar','none','ToolBar','none','Color','w','Visible','off', ...
            'Units','centimeters','Position',[0 0 16 22]);
 try, f.Theme = 'light'; catch, end
-hT = tiledlayout(f, 5, 1, 'TileSpacing','compact','Padding','compact');
-if isempty(lNeutral); lNstr = '[]'; else; lNstr = sprintf('%.2f', lNeutral); end
+hT = tiledlayout(f, 5, 1, 'TileSpacing','tight','Padding','tight');
+if isempty(lNeutral)
+    lNstr = '[]';
+elseif ischar(lNeutral) || (isstring(lNeutral) && isscalar(lNeutral))
+    lNstr = char(lNeutral);
+else
+    lNstr = sprintf('%.2f', lNeutral);
+end
 ttl = {sprintf('hueA=%s hueB=%s', mat2str(hues{1}), mat2str(hues{2})), ...
        sprintf('wN=%.2f wTr=%.2f', wNeutral, wTransition), ...
-       sprintf('lN=%s cO=%.2f', lNstr, cOuter), ...
+       sprintf('lN=%s cO=%s', lNstr, localFmtCOuter(cOuter)), ...
        sprintf('\\DeltaE=%.0f', info.innerDeltaE)};
 h = localPlotColumn(hT, 1, 1, x, cmap, info, ttl);
 localProfileLegend(h);
@@ -236,9 +288,53 @@ function base = localCacheName(hues, wNeutral, wTransition, lNeutral, cOuter, N)
 % Filename base encoding the inputs (used for the .mat cache and profile PNG).
 fmt = @(v) strrep(strrep(sprintf('%.4g', v), '.', 'p'), '-', 'm');
 fmtHue = @(h) sprintf('%sto%s', fmt(h(1)), fmt(h(2)));
-if isempty(lNeutral); lNs = 'auto'; else; lNs = fmt(lNeutral); end
+if isempty(lNeutral)
+    lNs = 'auto';
+elseif ischar(lNeutral) || (isstring(lNeutral) && isscalar(lNeutral))
+    lNs = char(lNeutral);
+else
+    lNs = fmt(lNeutral);
+end
+% cOuter: bare cO<outer> whenever cInner is 1 (so a scalar and its equivalent [1 v] pair share one
+% cache entry, and pre-2026-09-02 .mat files still hit), cO<inner>to<outer> otherwise -- reusing
+% fmtHue's own "<lo>to<hi>" convention for a two-valued field.
+if isscalar(cOuter) || cOuter(1) == 1
+    cOs = fmt(cOuter(end));
+else
+    cOs = sprintf('%sto%s', fmt(cOuter(1)), fmt(cOuter(2)));
+end
 base = sprintf('colormap_divergingHue_hA%s_hB%s_wN%s_wTr%s_lN%s_cO%s_N%d', ...
-    fmtHue(hues{1}), fmtHue(hues{2}), fmt(wNeutral), fmt(wTransition), lNs, fmt(cOuter), N);
+    fmtHue(hues{1}), fmtHue(hues{2}), fmt(wNeutral), fmt(wTransition), lNs, cOs, N);
+end
+
+% -----------------------------------------------------------------------
+function [isSweep, vals] = localCOuterSweep(cOuter)
+% cOuter's own sweep/pair disambiguation -- the one knob where "numel > 1 means sweep" does NOT hold,
+% because length 2 is its [cInner cOuter] pair (2026-09-02). Rules (see this file's Sweep-mode header):
+%   scalar               -> not a sweep (outer knob only)
+%   1x2 / 2x1            -> not a sweep, it's the PAIR   <-- the meaning that CHANGED
+%   2xK, K>=2            -> sweep of K pairs, one [cInner; cOuter] per column
+%   vector, numel>=3     -> sweep of that many outer knobs, cInner=1 throughout
+%   anything else        -> error, rather than guessing which of the two it meant
+% vals is returned as 2xK for every sweep case, so localSweep can index it uniformly by column.
+vals = [];
+if ~isnumeric(cOuter) || numel(cOuter) <= 2
+    isSweep = false;                                              % scalar, or the pair
+elseif size(cOuter,1) == 2
+    isSweep = true;  vals = cOuter;                               % 2xK: explicit pairs
+elseif isvector(cOuter)
+    isSweep = true;  vals = [ones(1,numel(cOuter)); cOuter(:).']; % K>=3 outer knobs, cInner=1
+else
+    error('colormap_divergingHue:badCOuterShape', ...
+        ['cOuter must be a scalar, a [cInner cOuter] pair, a 2xK matrix of pairs, or a length>=3 ' ...
+         'vector of outer knobs -- got %dx%d.'], size(cOuter,1), size(cOuter,2));
+end
+end
+
+% -----------------------------------------------------------------------
+function s = localFmtCOuter(cO)
+% cOuter for a panel title: "0.20" for the scalar/outer-only form, "[0.60 0.20]" for a pair.
+if numel(cO) == 2; s = sprintf('[%.2f %.2f]', cO(1), cO(2)); else; s = sprintf('%.2f', cO); end
 end
 
 % -----------------------------------------------------------------------

@@ -19,17 +19,47 @@ function [cmap, info] = colorDivergingHueLCH(hues, wNeutral, wTransition, lNeutr
 %                  2 - (wNeutral + 2*wTransition). Requires wNeutral + 2*wTransition <= 2.
 %   lNeutral     lightness of the neutral zone, a 0..1 knob: 0 = black, 1 = white, 0.5 = mid-gray. []
 %                matches the inner-edge lightness, so leaving the dead-zone is a pure chroma onset.
-%   cOuter       chroma at the OUTER extremes of the wings, a 0..1 knob: 0 = white, 1 = the most
-%                saturated colour achievable by BOTH wings (common gamut max, so the wings stay
-%                symmetric).
+%                'trans' (2026-08-21, Seb's own explicit ask): the transition zone does NOT blend
+%                towards a neutral colour at all -- each ramp instead holds the wing's own inner
+%                colour FIXED (L*/C*/hue unchanged across the whole ramp) and fades an ALPHA channel
+%                from 1 (at the wing) to 0 (at the neutral zone, which is itself fully transparent,
+%                alpha 0) -- "adopt the wing colour and gradually decrease transparency" instead of
+%                gradually desaturating towards grey. The returned cmap's RGB values are unaffected by
+%                a caller that ignores alpha (the neutral zone still renders as the inner-edge grey, as
+%                if lNeutral=[], so a base-layer caller with nothing to composite against degrades
+%                gracefully to a plain opaque colormap with a sharp edge at the transition-zone
+%                boundary) -- true transparency ONLY appears where a caller actually multiplies
+%                info.alpha into its own AlphaData (see info.alpha below; drawStatMapOverlay.m in the
+%                humanMouse project is the first such caller).
+%   cOuter       wing chroma knob(s), each 0..1, where 0 = white and 1 = that end's own most
+%                saturated in-gamut colour. Scalar or [cInner cOuter] pair (2026-09-02, Seb's own
+%                explicit ask):
+%                  scalar v        -- the OUTER extremes only, inner edges left at full saturation
+%                                     (equivalent to [1 v]; this is the historical behaviour and the
+%                                     ONLY form before 2026-09-02).
+%                  [cInner cOuter] -- cInner scales the INNER edges (the dead-zone-flanking colours),
+%                                     cOuter the OUTER extremes. cInner = 1 is the max-Delta-E pair
+%                                     the gamut search found; cInner = 0 whitens the inner edges out
+%                                     entirely.
+%                Both knobs interpolate that end's [L*,C*] linearly towards white ([100,0]) by
+%                (1 - knob), so the two wings stay symmetric (shared L*/C*, hue-only distinction) at
+%                every knob value. NOTE cInner < 1 deliberately GIVES UP some of this function's
+%                headline property -- maximal perceptual separation the instant a value leaves the
+%                dead zone; info.innerDeltaE reports the separation actually achieved, so a sweep
+%                panel shows what a given cInner costs.
 %   N            number of colours.
 %
 %   info  struct: innerALCH, innerBLCH, outerALCH, outerBLCH [L C H]; innerL, innerDeltaE; flatEdges,
-%                 transEdges, wingWidth (data units); Lprofile, Cprofile, Hprofile; and the dE profiles
-%                 dEprofile (+v vs -v), dEcentreProfile, dEouterProfile. (Same shape as
+%                 transEdges, wingWidth (data units); Lprofile, Cprofile, Hprofile; alpha; and the dE
+%                 profiles dEprofile (+v vs -v), dEcentreProfile, dEouterProfile. (Same shape as
 %                 colormap_blueNeutralRed.m's own pre-generalization info struct, with
 %                 innerBlueLCH/innerRedLCH/outerBlueLCH/outerRedLCH renamed innerALCH/innerBLCH/
-%                 outerALCH/outerBLCH -- side A/B rather than a fixed blue/red identity.)
+%                 outerALCH/outerBLCH -- side A/B rather than a fixed blue/red identity.) alpha is
+%                 [N x 1], all-ones UNLESS lNeutral='trans' (see above), in which case it ramps 1 (wing)
+%                 -> 0 (neutral zone, flat at 0 across the whole flat plateau).
+%                 innerALCH/innerBLCH/innerL/innerDeltaE all describe the inner edges AS ACTUALLY
+%                 BUILT, i.e. AFTER the cInner knob is applied (identical to the raw gamut-search
+%                 result at cInner = 1, so no change vs. pre-2026-09-02 for a scalar cOuter).
 %
 %   The 'shape' constant. Within a wing the colour is interpolated from the outer extreme (at the wing
 %   tip) to the inner max-separation colour (at the dead-zone edge) as
@@ -44,8 +74,9 @@ function [cmap, info] = colorDivergingHueLCH(hues, wNeutral, wTransition, lNeutr
 %   Design. The two colours flanking the neutral zone (side-A-inner, side-B-inner) are found by
 %   searching the sRGB gamut, WITHIN each side's own hue sector, for the equal-lightness pair with the
 %   largest CIELAB Delta-E, so the instant a value leaves the dead-zone its sign is maximally legible.
-%   The L* and C* profiles are ALWAYS symmetric across the two wings (equal lightness, equal chroma at
-%   both the inner and outer ends); only hue distinguishes the sign, so neither sign dominates.
+%   (cInner < 1 then walks that pair back towards white -- an opt-out from maximal separation, off by
+%   default.) The L* and C* profiles are ALWAYS symmetric across the two wings (equal lightness, equal
+%   chroma at both the inner and outer ends); only hue distinguishes the sign, so neither sign dominates.
 %
 %   Built in CIE LCH and converted via the Colorspace-Transformations tool (same dependency as
 %   colormap_bivariateBlackToSpectral.m) -- interpolating L*/C* linearly in LCH space and converting to
@@ -53,8 +84,10 @@ function [cmap, info] = colorDivergingHueLCH(hues, wNeutral, wTransition, lNeutr
 %   (see colormap_divergingHue.m's own header for the fuller rationale this generalization was built
 %   from, 2026-08-19).
 %
-%   colorDivergingHueLCH({[250 300],[340 40]}, 0.4, 0.16, [], 0.2, 256)   % blue/red, colormap_blueNeutralRed.m's own defaults
-%   colorDivergingHueLCH({[80 140],[260 320]}, 0.4, 0.16, [], 0.2, 256)   % green/violet, a non-activation-map hue pair
+%   colorDivergingHueLCH({[250 300],[340 40]}, 0.4, 0.16, [], 0.2, 256)       % blue/red, colormap_blueNeutralRed.m's own defaults
+%   colorDivergingHueLCH({[80 140],[260 320]}, 0.4, 0.16, [], 0.2, 256)       % green/violet, a non-activation-map hue pair
+%   colorDivergingHueLCH({[250 300],[340 40]}, 0.4, 0.16, [], [1 0.2], 256)   % identical to the first line (scalar 0.2 == [1 0.2])
+%   colorDivergingHueLCH({[250 300],[340 40]}, 0.4, 0.16, [], [0.6 0.2], 256) % inner edges pulled 40% towards white too
 
     assert(iscell(hues) && numel(hues)==2, 'colorDivergingHueLCH:badHues', ...
         'hues must be a 1x2 cell {hueA, hueB}, each a [lo hi] degree sector -- got %s.', class(hues));
@@ -67,6 +100,16 @@ function [cmap, info] = colorDivergingHueLCH(hues, wNeutral, wTransition, lNeutr
         'wNeutral + 2*wTransition = %.3f exceeds the colorbar width (2); no room for wings.', ...
         wNeutral + 2*wTransition);
     assert(isscalar(N) && N >= 2, 'colorDivergingHueLCH:badN', 'N must be a scalar >= 2.');
+
+    % ---- cOuter: scalar (outer only) or [cInner cOuter] pair ---------------
+    % A scalar leaves the inner edges at full saturation (cInner = 1), i.e. exactly the historical
+    % behaviour. Two separate locals from here on -- cOuter itself is never reused as the pair.
+    assert(isnumeric(cOuter) && any(numel(cOuter) == [1 2]), 'colorDivergingHueLCH:badCOuter', ...
+        'cOuter must be a numeric scalar (outer knob) or a [cInner cOuter] pair -- got %s of numel %d.', ...
+        class(cOuter), numel(cOuter));
+    % (deliberately NOT range-asserted to [0,1]: out-of-range values were never rejected before this
+    % pair support was added, and the chroma clamp at the end of the build keeps them harmless.)
+    if isscalar(cOuter); cInner = 1; cOut = cOuter; else; cInner = cOuter(1); cOut = cOuter(2); end
 
     c = localConsts(); shape = c.shape; gamutN = c.gamutN;
 
@@ -94,10 +137,29 @@ function [cmap, info] = colorDivergingHueLCH(hues, wNeutral, wTransition, lNeutr
     % ---- equalise inner chroma (symmetric wings, always) -------------------
     Cc = min(innerALCH(2), innerBLCH(2));   % common chroma in gamut for both
     innerALCH(2) = Cc; innerBLCH(2) = Cc;
+
+    % ---- inner-edge colours: desaturate towards white by cInner ------------
+    % Same [L*,C*]-towards-white([100,0]) interpolation the outer extremes get below, applied to the
+    % max-separation pair. Hue is untouched, and both sides share one (L*,C*), so the wings stay
+    % symmetric. cInner = 1 is a no-op, leaving the search result exactly as before.
+    innerL = 100 + cInner * (innerL - 100);
+    innerC =       cInner *  Cc;
+    innerALCH(1) = innerL; innerALCH(2) = innerC;
+    innerBLCH(1) = innerL; innerBLCH(2) = innerC;
     dE = lchDeltaE(innerALCH, innerBLCH);
 
-    % ---- neutral-zone lightness (0 black .. 1 white; [] -> inner L) ---------
-    if isempty(lNeutral); NeutralL = innerL; else; NeutralL = 100 * lNeutral; end
+    % ---- neutral-zone lightness (0 black .. 1 white; [] -> inner L; 'trans' -> see header) ---------
+    isTransNeutral = false;
+    if ischar(lNeutral) || (isstring(lNeutral) && isscalar(lNeutral))
+        assert(strcmpi(char(lNeutral), 'trans'), 'colorDivergingHueLCH:badLNeutral', ...
+            'lNeutral string value must be ''trans'' -- got ''%s''.', char(lNeutral));
+        isTransNeutral = true;
+        NeutralL = innerL;   % RGB fallback for an alpha-blind caller -- same grey as lNeutral=[]
+    elseif isempty(lNeutral)
+        NeutralL = innerL;
+    else
+        NeutralL = 100 * lNeutral;
+    end
 
     % ---- common in-gamut chroma envelope of the two hues -------------------
     % Cenv(L) = max chroma reachable by BOTH hues at lightness L. Sharing this single envelope for both
@@ -109,8 +171,8 @@ function [cmap, info] = colorDivergingHueLCH(hues, wNeutral, wTransition, lNeutr
 
     % ---- outer-extreme colours: a COMMON (L*,C*) for both wings ------------
     [outerC, iMax] = max(Cenv); outerL = Lg(iMax);   % most-saturated common point
-    oL = 100 + cOuter * (outerL - 100);
-    oC =       cOuter *  outerC;
+    oL = 100 + cOut * (outerL - 100);
+    oC =       cOut *  outerC;
     outerALCH = [oL, oC, innerALCH(3)];
     outerBLCH = [oL, oC, innerBLCH(3)];
 
@@ -125,7 +187,7 @@ function [cmap, info] = colorDivergingHueLCH(hues, wNeutral, wTransition, lNeutr
     tWingB  = tPlatHi + wTransition/2; % side-B inner edge
 
     t = linspace(0, 1, N)';
-    L = zeros(N,1); C = zeros(N,1); H = zeros(N,1);
+    L = zeros(N,1); C = zeros(N,1); H = zeros(N,1); alpha = ones(N,1);
 
     isSideAW = t <  tWingA;                       % side-A wing
     isSideAR = t >= tWingA & t < tPlatLo;         % side-A ramp
@@ -139,20 +201,31 @@ function [cmap, info] = colorDivergingHueLCH(hues, wNeutral, wTransition, lNeutr
     C(isSideAW) = outerALCH(2) + (innerALCH(2) - outerALCH(2)) .* sA;
     H(isSideAW) = innerALCH(3);
 
-    % side-A ramp: inner colour -> neutral (linear)
+    % side-A ramp: inner colour -> neutral (linear); 'trans': inner colour held FIXED, alpha 1 -> 0
     rA = (t(isSideAR) - tWingA) ./ max(tPlatLo - tWingA, eps);   % 0 inner ... 1 neutral
-    L(isSideAR) = innerALCH(1) + (NeutralL - innerALCH(1)) .* rA;
-    C(isSideAR) = innerALCH(2) + (0        - innerALCH(2)) .* rA;
-    H(isSideAR) = innerALCH(3);
+    if isTransNeutral
+        L(isSideAR) = innerALCH(1); C(isSideAR) = innerALCH(2); H(isSideAR) = innerALCH(3);
+        alpha(isSideAR) = 1 - rA;
+    else
+        L(isSideAR) = innerALCH(1) + (NeutralL - innerALCH(1)) .* rA;
+        C(isSideAR) = innerALCH(2) + (0        - innerALCH(2)) .* rA;
+        H(isSideAR) = innerALCH(3);
+    end
 
-    % flat neutral plateau
+    % flat neutral plateau; 'trans': fully transparent (alpha 0)
     L(isNeut) = NeutralL; C(isNeut) = 0; H(isNeut) = 0;
+    if isTransNeutral; alpha(isNeut) = 0; end
 
-    % side-B ramp: neutral -> inner colour (linear)
+    % side-B ramp: neutral -> inner colour (linear); 'trans': inner colour held FIXED, alpha 0 -> 1
     rB = (t(isSideBR) - tPlatHi) ./ max(tWingB - tPlatHi, eps);   % 0 neutral ... 1 inner
-    L(isSideBR) = NeutralL + (innerBLCH(1) - NeutralL) .* rB;
-    C(isSideBR) = 0        + (innerBLCH(2) - 0       ) .* rB;
-    H(isSideBR) = innerBLCH(3);
+    if isTransNeutral
+        L(isSideBR) = innerBLCH(1); C(isSideBR) = innerBLCH(2); H(isSideBR) = innerBLCH(3);
+        alpha(isSideBR) = rB;
+    else
+        L(isSideBR) = NeutralL + (innerBLCH(1) - NeutralL) .* rB;
+        C(isSideBR) = 0        + (innerBLCH(2) - 0       ) .* rB;
+        H(isSideBR) = innerBLCH(3);
+    end
 
     % side-B wing: inner -> outer
     sB = ((t(isSideBW) - tWingB) ./ max(1 - tWingB, eps)) .^ shape;  % 0 inner ... 1 outer
@@ -183,6 +256,7 @@ function [cmap, info] = colorDivergingHueLCH(hues, wNeutral, wTransition, lNeutr
     info.Lprofile = LabOut(:,1);
     info.Cprofile = hypot(LabOut(:,2), LabOut(:,3));
     info.Hprofile = mod(atan2d(LabOut(:,3), LabOut(:,2)), 360);   % hue [deg]; meaningless where C*~0
+    info.alpha = alpha;                                           % [N x 1]; all-ones unless lNeutral='trans'
     % ΔE between the side-B(+v) and side-A(-v) colours at matched distance from centre (CIELAB distance
     % of each row to its mirror); symmetric by construction, 0 at the centre, peaking where the two
     % wings are most distinguishable.
