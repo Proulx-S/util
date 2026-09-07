@@ -33,6 +33,15 @@ function [cmap, info] = colormap_blueNeutralRed(wNeutral, wTransition, lNeutral,
 %                0 = white, 1 = the most saturated colour achievable by BOTH
 %                wings (common gamut max, so the wings stay symmetric).
 %                                                                  (default 0.2)
+%                SCALAR ONLY here. colorDivergingHueLCH.m also accepts a
+%                [cInner cOuter] pair (2026-09-02) and colormap_divergingHue.m
+%                exposes it, but this LEGACY wrapper deliberately does NOT: a
+%                length-2 cOuter still means a 2-value SWEEP here, and this
+%                file's own localCacheName/panel titles would garble a pair.
+%                Passing one is a silent mis-parse, not an error -- use
+%                colormap_divergingHue.m directly if you want cInner. Mirroring
+%                the pair support here is a deferred (and probably unnecessary,
+%                given this file is legacy/activation-maps-only) item.
 %   N            number of colours.                       (default 256)
 %   plotProfiles when true, also save a profile panel (colorbar + L*/C*/hue +
 %                the three ΔE profiles) for THIS colormap into the working
@@ -212,7 +221,7 @@ ne = size(exps,1);
 f = figure('MenuBar','none','ToolBar','none','Color','w','Visible','off', ...
            'Units','centimeters','Position',[0 0 5.5*ne 22]);
 try, f.Theme = 'light'; catch, end
-hT = tiledlayout(f, 5, ne, 'TileSpacing','compact','Padding','compact');
+hT = tiledlayout(f, 5, ne, 'TileSpacing','tight','Padding','tight');
 
 hLeg = gobjects(1,6);
 for k = 1:ne
@@ -238,7 +247,7 @@ x  = linspace(-1, 1, N);
 f = figure('MenuBar','none','ToolBar','none','Color','w','Visible','off', ...
            'Units','centimeters','Position',[0 0 5.5*ne 22]);
 try, f.Theme = 'light'; catch, end
-hT = tiledlayout(f, 5, ne, 'TileSpacing','compact','Padding','compact');
+hT = tiledlayout(f, 5, ne, 'TileSpacing','tight','Padding','tight');
 
 hLeg = gobjects(1,6);
 for k = 1:ne
@@ -271,7 +280,7 @@ x = linspace(-1, 1, size(cmap,1));
 f = figure('MenuBar','none','ToolBar','none','Color','w','Visible','off', ...
            'Units','centimeters','Position',[0 0 16 22]);
 try, f.Theme = 'light'; catch, end
-hT = tiledlayout(f, 5, 1, 'TileSpacing','compact','Padding','compact');
+hT = tiledlayout(f, 5, 1, 'TileSpacing','tight','Padding','tight');
 if isempty(lNeutral); lNstr = '[]'; else; lNstr = sprintf('%.2f', lNeutral); end
 ttl = {'custom', sprintf('wN=%.2f wTr=%.2f', wNeutral, wTransition), ...
        sprintf('lN=%s cO=%.2f', lNstr, cOuter), ...

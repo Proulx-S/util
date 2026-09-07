@@ -85,7 +85,7 @@ end
 % Plot colormap
 if cbFlag
     figure('MenuBar','none','ToolBar','none');
-    hT = tiledlayout(3,2); hT.TileSpacing = 'compact'; hT.Padding = 'compact'; hT.TileIndexing = 'columnmajor'; ax = {};
+    hT = tiledlayout(3,2); hT.TileSpacing = 'tight'; hT.Padding = 'tight'; hT.TileIndexing = 'columnmajor'; ax = {};
     for i = 1:3
         ax{end+1} = nexttile(hT,i);
         histogram(reshape(RGB(i,:,:),[numel(RGB(i,:,:)) 1]),2^6);
