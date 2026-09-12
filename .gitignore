@@ -115,3 +115,7 @@ octave-workspace
 # Cursor
 *.cursorignore
 *.code-workspace
+# Agent worktrees (bgIsolation) and the throwaway scratch folder (bass genesis.md "Scratch files")
+.claude/worktrees/
+scratch/*
+!scratch/.gitkeep

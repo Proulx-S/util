@@ -29,12 +29,16 @@ function gitClone(url, folder, repoSubDir, branch, allowWrite)
     % UNCOMMITTED-CHANGES SAFETY NET: this folder should not normally have
     % uncommitted changes, but if it does (an edit made in place, a prior run that
     % crashed mid-sync), don't silently discard whatever is sitting here. Any
-    % uncommitted changes (tracked + untracked) are stashed before the
+    % uncommitted changes to TRACKED files are stashed before the
     % checkout/fast-forward above can touch the working tree, then popped back once
     % the sync itself is done. A clean pop is silent (just a confirmation message);
     % a pop that would conflict is left IN THE STASH -- never dropped, never forced
     % -- with an explicit `git stash list`/`git stash pop` recovery message so the
-    % conflict can be resolved by hand.
+    % conflict can be resolved by hand. Untracked files are deliberately NOT
+    % counted or stashed (`git status --porcelain -uno`, `git stash push` without
+    % -u): checkout / --ff-only never discard them, so stashing buys nothing, and
+    % `stash -u` would physically remove an agent worktree's checkout under
+    % .claude/worktrees/ (or any other untracked dir) from the working tree.
     %
     % If you see "authentication required": run in a terminal (outside MATLAB):
     %   cd <repo_folder>
@@ -64,13 +68,14 @@ function gitClone(url, folder, repoSubDir, branch, allowWrite)
         system(['chmod -R u+w ' folder]);
 
         % Safety net (see file header UNCOMMITTED-CHANGES SAFETY NET): stash any uncommitted
-        % changes BEFORE the checkout/fast-forward below can touch the working tree.
+        % changes to TRACKED files BEFORE the checkout/fast-forward below can touch the working
+        % tree. Untracked files are neither counted (-uno) nor stashed (no -u) -- see header.
         wasStashed = false; stashLabel = '';
-        [~, dirtyStatus] = system(['cd ' folder ' && git status --porcelain']);
+        [~, dirtyStatus] = system(['cd ' folder ' && git status --porcelain -uno']);
         if ~isempty(strtrim(dirtyStatus))
             stashLabel = ['gitClone.m auto-stash ' char(datetime('now','Format','yyyy-MM-dd_HHmmss'))];
-            cmdLog{end+1} = ['git stash push -u -m "' stashLabel '"'];
-            [stStash, stashOut] = system(['cd ' folder ' && git stash push -u -m ''' stashLabel '''']);
+            cmdLog{end+1} = ['git stash push -m "' stashLabel '"'];
+            [stStash, stashOut] = system(['cd ' folder ' && git stash push -m ''' stashLabel '''']);
             if stStash == 0 && ~contains(stashOut, 'No local changes to save')
                 wasStashed = true;
                 disp([newline '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!' newline ...
@@ -197,7 +202,7 @@ function gitClone(url, folder, repoSubDir, branch, allowWrite)
             system(['bash -c ''' cmd2 '''']);
         end
     end
-    addpath(genpath(fullfile(folder,repoSubDir)));
+    addpath(genpathClean(fullfile(folder,repoSubDir)));   % see genpathClean.m: no .git/.claude/scratch
     disp(['added to path:' newline ' ' fullfile(folder,repoSubDir)]);
     if anomaly
         disp([newline '--------------------------------' newline ...

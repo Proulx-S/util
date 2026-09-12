@@ -17,7 +17,7 @@ function getClone(url, folder, repoSubDir, branch)
 
     if exist(fullfile(folder,repoSubDir), 'dir')
         disp([folder ' already exists locally -- leaving it untouched.']);
-        addpath(genpath(fullfile(folder,repoSubDir)));
+        addpath(genpathClean(fullfile(folder,repoSubDir)));   % see genpathClean.m: no .git/.claude/scratch
         disp(['added to path:' newline ' ' fullfile(folder,repoSubDir)]);
         return
     end
