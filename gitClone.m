@@ -6,10 +6,14 @@ function gitClone(url, folder, repoSubDir, branch, allowWrite)
     % (see FAST-FORWARD below; this was previously a gap -- a local branch already
     % matching the target name was left exactly where it was, never advanced).
     %
-    % folder is left read-only afterward (this is meant to be the shared canonical
-    % clone used across projects) unless allowWrite is true. To develop a tool
-    % locally instead, use getClone.m, which clones a detached, writable,
-    % project-tracked copy.
+    % folder is left WRITABLE afterward. (Until 2026-09-11 it was chmod'd read-only
+    % as the shared canonical clone used across projects; that lock is retired --
+    % modifications to a shared tool now go through a dedicated agent session
+    % launched in that tool's own directory, on a branch + PR like any repo. A
+    % clone left read-only by an older gitClone is unlocked on its next sync.)
+    % allowWrite (5th arg) is accepted for backward compatibility but ignored.
+    % getClone.m still clones a detached, project-tracked copy for the cases that
+    % need one.
     %
     % FAST-FORWARD: once on the target branch (whether just switched to it or
     % already there), runs `git merge --ff-only origin/<branch>`. This is what
@@ -18,21 +22,23 @@ function gitClone(url, folder, repoSubDir, branch, allowWrite)
     % so without this, a folder already sitting on (say) 'main' but behind
     % origin/main was silently left stale even though its own status check further
     % below would print "N commits behind" and do nothing about it. A genuine
-    % divergence (local commits not on origin -- should not happen on a pristine,
-    % lock-protected mirror) makes --ff-only refuse rather than silently resolving
-    % it; folder is left WRITABLE (not re-locked) in that case so it can be
-    % inspected by hand.
+    % divergence (local commits not on origin -- should not happen on a pristine
+    % shared mirror) makes --ff-only refuse rather than silently resolving it, and
+    % a loud message asks for it to be inspected by hand.
     %
-    % UNCOMMITTED-CHANGES SAFETY NET: this folder should never have uncommitted
-    % changes (it's read-only whenever nobody is actively calling this function),
-    % but if the lock was bypassed (allowWrite=true) or a prior run crashed before
-    % re-locking, don't silently discard whatever is sitting here. Any uncommitted
-    % changes (tracked + untracked) are stashed before the checkout/fast-forward
-    % above can touch the working tree, then popped back once the sync itself is
-    % done. A clean pop is silent (just a confirmation message); a pop that would
-    % conflict is left IN THE STASH -- never dropped, never forced -- with an
-    % explicit `git stash list`/`git stash pop` recovery message, and the folder is
-    % again left WRITABLE (not re-locked) so the conflict can be resolved by hand.
+    % UNCOMMITTED-CHANGES SAFETY NET: this folder should not normally have
+    % uncommitted changes, but if it does (an edit made in place, a prior run that
+    % crashed mid-sync), don't silently discard whatever is sitting here. Any
+    % uncommitted changes to TRACKED files are stashed before the
+    % checkout/fast-forward above can touch the working tree, then popped back once
+    % the sync itself is done. A clean pop is silent (just a confirmation message);
+    % a pop that would conflict is left IN THE STASH -- never dropped, never forced
+    % -- with an explicit `git stash list`/`git stash pop` recovery message so the
+    % conflict can be resolved by hand. Untracked files are deliberately NOT
+    % counted or stashed (`git status --porcelain -uno`, `git stash push` without
+    % -u): checkout / --ff-only never discard them, so stashing buys nothing, and
+    % `stash -u` would physically remove an agent worktree's checkout under
+    % .claude/worktrees/ (or any other untracked dir) from the working tree.
     %
     % If you see "authentication required": run in a terminal (outside MATLAB):
     %   cd <repo_folder>
@@ -40,7 +46,7 @@ function gitClone(url, folder, repoSubDir, branch, allowWrite)
     % You may be prompted for credentials; use a personal access token if 2FA is enabled.
     if ~exist('repoSubDir', 'var'); repoSubDir = []; end
     if ~exist('branch', 'var'); branch = []; end
-    if ~exist('allowWrite', 'var') || isempty(allowWrite); allowWrite = false; end
+    % allowWrite is a retired no-op (see header); still accepted so 5-arg callers keep working.
     branch = char(branch);
     if ~isempty(branch)
         branch = strtrim(branch);
@@ -53,27 +59,28 @@ function gitClone(url, folder, repoSubDir, branch, allowWrite)
     statusMsg = '';
     uncommittedMsg = '';
     switchedToDefaultMsg = '';
-    skipRelock = false;   % set true on an unresolved anomaly (diverged history / stash-pop conflict)
+    anomaly = false;   % set true on an unresolved anomaly (diverged history / stash-pop conflict)
     if exist(fullfile(folder,repoSubDir), 'dir')
         disp([url ' ' repoSubDir newline 'already downloaded to:' newline ' ' folder]);
 
-        % A prior run may have left this read-only; restore write access before
-        % fetching/checking out.
+        % A gitClone older than 2026-09-11 left this read-only; make sure it is writable
+        % before fetching/checking out (one-time unlock, harmless on an already-writable folder).
         system(['chmod -R u+w ' folder]);
 
         % Safety net (see file header UNCOMMITTED-CHANGES SAFETY NET): stash any uncommitted
-        % changes BEFORE the checkout/fast-forward below can touch the working tree.
+        % changes to TRACKED files BEFORE the checkout/fast-forward below can touch the working
+        % tree. Untracked files are neither counted (-uno) nor stashed (no -u) -- see header.
         wasStashed = false; stashLabel = '';
-        [~, dirtyStatus] = system(['cd ' folder ' && git status --porcelain']);
+        [~, dirtyStatus] = system(['cd ' folder ' && git status --porcelain -uno']);
         if ~isempty(strtrim(dirtyStatus))
             stashLabel = ['gitClone.m auto-stash ' char(datetime('now','Format','yyyy-MM-dd_HHmmss'))];
-            cmdLog{end+1} = ['git stash push -u -m "' stashLabel '"'];
-            [stStash, stashOut] = system(['cd ' folder ' && git stash push -u -m ''' stashLabel '''']);
+            cmdLog{end+1} = ['git stash push -m "' stashLabel '"'];
+            [stStash, stashOut] = system(['cd ' folder ' && git stash push -m ''' stashLabel '''']);
             if stStash == 0 && ~contains(stashOut, 'No local changes to save')
                 wasStashed = true;
                 disp([newline '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!' newline ...
-                      '!!! ' folder ' had UNCOMMITTED CHANGES (unexpected for a locked' newline ...
-                      '!!! shared clone) -- stashed as: ' stashLabel newline ...
+                      '!!! ' folder ' had UNCOMMITTED CHANGES (unexpected for a shared' newline ...
+                      '!!! clone) -- stashed as: ' stashLabel newline ...
                       '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!']);
             end
         end
@@ -141,11 +148,11 @@ function gitClone(url, folder, repoSubDir, branch, allowWrite)
             cmdLog{end+1} = ['git merge --ff-only origin/' branch];
             [stFF, ffOut] = system(ffCmd);
             if stFF ~= 0
-                skipRelock = true;
+                anomaly = true;
                 disp([newline '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!' newline ...
                       '!!! Could not fast-forward ' folder ' to origin/' branch '.' newline ...
                       '!!! (local history has diverged -- should not happen on a pristine' newline ...
-                      '!!! shared mirror; investigate by hand -- folder left WRITABLE)' newline ...
+                      '!!! shared mirror; investigate by hand)' newline ...
                       '!!! git output:' newline strtrim(ffOut) newline ...
                       '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!']);
             end
@@ -158,12 +165,12 @@ function gitClone(url, folder, repoSubDir, branch, allowWrite)
         % skipped if the fast-forward above already hit an unresolved anomaly (working tree state
         % is uncertain then; better to leave the stash untouched too). Never forced: a pop that
         % would conflict is left IN THE STASH exactly as-is, never dropped.
-        if wasStashed && ~skipRelock
+        if wasStashed && ~anomaly
             [stPop, popOut] = system(['cd ' folder ' && git stash pop 2>&1']);
             if stPop == 0
                 disp(['Restored the auto-stashed uncommitted changes (' stashLabel ') cleanly.']);
             else
-                skipRelock = true;
+                anomaly = true;
                 disp([newline '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!' newline ...
                       '!!! Auto-stash ''' stashLabel ''' could NOT be reapplied cleanly (conflicts' newline ...
                       '!!! with the newly-synced state) -- LEFT IN THE STASH, not dropped.' newline ...
@@ -195,26 +202,14 @@ function gitClone(url, folder, repoSubDir, branch, allowWrite)
             system(['bash -c ''' cmd2 '''']);
         end
     end
-    addpath(genpath(fullfile(folder,repoSubDir)));
+    addpath(genpathClean(fullfile(folder,repoSubDir)));   % see genpathClean.m: no .git/.claude/scratch
     disp(['added to path:' newline ' ' fullfile(folder,repoSubDir)]);
-    if skipRelock
+    if anomaly
         disp([newline '--------------------------------' newline ...
-            'NOTE: ' folder ' left WRITABLE -- an anomaly above (diverged history, or a' newline ...
-            'stash-pop conflict) needs resolving by hand before it should be re-locked.' newline ...
+            'NOTE: ' folder ' needs attention -- an anomaly above (diverged history, or a' newline ...
+            'stash-pop conflict) needs resolving by hand.' newline ...
             'Re-run gitClone (or fix it directly) once resolved.' newline ...
             '--------------------------------']);
-    elseif ~allowWrite
-        system(['chmod -R a-w ' folder]);
-        disp([newline '--------------------------------' newline ...
-            'NOTE: ' folder ' is now read-only. It''s the shared canonical clone used' newline ...
-            'by every project -- edits here can be silently overwritten and can race' newline ...
-            'concurrent runs.' newline ...
-            'To develop this tool locally: use getClone.m instead (tracks a detached' newline ...
-            'copy in your project''s own repo). To write here anyway (not recommended):' newline ...
-            'call gitClone with allowWrite=true.' newline ...
-            '--------------------------------']);
-    else
-        disp('NOTE: read-only protection disabled for this call (allowWrite=true).');
     end
     % Print git command history
     if ~isempty(cmdLog)

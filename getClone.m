@@ -1,12 +1,14 @@
 function getClone(url, folder, repoSubDir, branch)
     % Get a detached, locally-developable copy of a tool repo, tracked by the
     % calling project's own repo -- for deliberately modifying tool source from
-    % inside a project, as opposed to gitClone.m's read-only shared clone.
+    % inside a project, as opposed to gitClone.m's shared clone that every project
+    % syncs from origin.
     %
     % folder is expected to be a project-local path (e.g. project/devTools/<tool>).
     % If folder already exists, it is left untouched (never clobbers in-progress
     % local edits) -- only addpath is (re-)run.
-    % Otherwise: clones fresh from url (writable, via gitClone's allowWrite=true),
+    % Otherwise: clones fresh from url via gitClone (the trailing true is gitClone's
+    % retired allowWrite arg, kept for compatibility -- every clone is writable now),
     % records provenance (url, branch, commit SHA) to folder/.origin.json, then
     % strips folder/.git so the copy is no longer its own repo -- the project's
     % repo tracks it like any other project file from then on.
@@ -15,7 +17,7 @@ function getClone(url, folder, repoSubDir, branch)
 
     if exist(fullfile(folder,repoSubDir), 'dir')
         disp([folder ' already exists locally -- leaving it untouched.']);
-        addpath(genpath(fullfile(folder,repoSubDir)));
+        addpath(genpathClean(fullfile(folder,repoSubDir)));   % see genpathClean.m: no .git/.claude/scratch
         disp(['added to path:' newline ' ' fullfile(folder,repoSubDir)]);
         return
     end
