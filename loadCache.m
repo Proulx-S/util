@@ -9,15 +9,17 @@ function loadCache(level)
     %     paths returned by checkCache() -- loaded as-is, no caller resolution.
     if ischar(level) || isstring(level)
         cacheFile = char(level);
+        tag = 'loadCache';
     else
         cacheFile = cacheFileFor(level);
+        tag = sprintf('loadCache(%g)', level);
     end
     if ~isfile(cacheFile)
-        error('loadCache:missing', 'No cache to load: %s', cacheFile);
+        error('loadCache:missing', '%s: cache not found -> %s', tag, cacheFile);
     end
-    fprintf('loadCache: loading -> %s\n', cacheFile);
+    fprintf('%s: cache found, loading -> %s\n', tag, cacheFile);
     esc = strrep(cacheFile, '''', '''''');   % escape single quotes for the eval'd string
     tLoad = tic;
     evalin('caller', sprintf('load(''%s'');', esc));
-    fprintf('loadCache: loaded in %.2f s <- %s\n', toc(tLoad), cacheFile);
+    fprintf('%s: loaded in %.2f s <- %s\n', tag, toc(tLoad), cacheFile);
 end

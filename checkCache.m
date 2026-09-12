@@ -10,6 +10,8 @@ function tf = checkCache(level)
     %   end
     %
     % Cache path == the caller's file with LEVEL appended (see cacheFileFor).
+    % Prints the resolved path and whether the cache was found, so a doIt's
+    % console log shows which checkpoint each guarded block hit.
     %
     % Side effect: starts LEVEL's block stopwatch (see cacheTimer), so saveCache
     % can report how long the guarded block took -- no tic/toc needed in the doIt.
@@ -41,6 +43,12 @@ function tf = checkCache(level)
         tf = cacheFiles;
         return
     end
-    tf = ~isfile(cacheFileFor(level));
+    cacheFile = cacheFileFor(level);
+    tf = ~isfile(cacheFile);
+    if tf
+        fprintf('checkCache(%g): cache not found, block will run -> %s\n', level, cacheFile);
+    else
+        fprintf('checkCache(%g): cache found, block skipped -> %s\n', level, cacheFile);
+    end
     cacheTimer(level, 'start');
 end
