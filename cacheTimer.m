@@ -1,14 +1,16 @@
-function elapsed = cacheTimer(level, action)
+function elapsed = cacheTimer(level, action, tag)
     % Shared per-level stopwatch for the doIt cache helpers, so the doIt itself
     % needs no tic/toc. checkCache starts a level's clock; saveCache reads it to
     % report how long the guarded block took to compute.
-    %   cacheTimer(level,'start') -> (re)start the clock for LEVEL
-    %   cacheTimer(level,'read')  -> seconds since that start (NaN if never started)
-    % State is persistent and keyed by level, so nested levels don't clobber each
-    % other. clearvars (top of a doIt) does not wipe it; each 'start' resets it.
+    %   cacheTimer(level,'start'[,tag]) -> (re)start the clock for LEVEL (and TAG)
+    %   cacheTimer(level,'read'[,tag])  -> seconds since that start (NaN if never started)
+    % State is persistent and keyed by level + tag, so nested levels, and the same
+    % level under different tags, don't clobber each other. clearvars (top of a
+    % doIt) does not wipe it; each 'start' resets it.
     persistent T
-    if isempty(T); T = containers.Map('KeyType','double','ValueType','uint64'); end
-    key = double(level);
+    if isempty(T); T = containers.Map('KeyType','char','ValueType','uint64'); end
+    if nargin < 3 || isempty(tag); tag = ''; end
+    key = sprintf('%.17g|%s', double(level), char(tag));
     elapsed = NaN;
     switch action
         case 'start'
