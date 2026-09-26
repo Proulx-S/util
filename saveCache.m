@@ -1,6 +1,9 @@
-function saveCache(level)
+function saveCache(level, tag)
     % Checkpoint the CALLER's workspace to the LEVEL cache file (see
     % cacheFileFor for the path). Restore it later with loadCache(level).
+    % Optional TAG (char/string, [A-Za-z0-9_-]+) selects a tagged cache file,
+    % <doIt>.<tag>.cache<level>.mat; restore it with loadCache(level, tag). See
+    % checkCache. Absent or empty TAG gives the untagged file.
     % Saved with -v7.3 so large variables (>2 GB) are handled. Reports the block's
     % compute time (from checkCache) and the save time, so the doIt needs no
     % tic/toc.
@@ -11,10 +14,11 @@ function saveCache(level)
     % objects. Saving a handle serialises the whole figure behind it -- slow to
     % save and slow to load -- and a doIt never needs one to resume. Skipped
     % names are listed. A cell/struct that mixes handles with data is saved as-is.
-    cacheFile = cacheFileFor(level);
-    tComp = cacheTimer(level, 'read');
+    if nargin < 2; tag = ''; end
+    [cacheFile, label] = cacheFileFor(level, tag);
+    tComp = cacheTimer(level, 'read', tag);
     if ~isnan(tComp)
-        fprintf('saveCache(%g): block computed in %.2f s\n', level, tComp);
+        fprintf('saveCache(%s): block computed in %.2f s\n', label, tComp);
     end
 
     % Gather the caller's variables into a struct (copy-on-write: no duplication),
@@ -31,14 +35,14 @@ function saveCache(level)
         end
     end
     if ~isempty(skipped)
-        fprintf('saveCache(%g): skipping %d graphics handle var(s): %s\n', ...
-            level, numel(skipped), strjoin(skipped, ', '));
+        fprintf('saveCache(%s): skipping %d graphics handle var(s): %s\n', ...
+            label, numel(skipped), strjoin(skipped, ', '));
     end
 
-    fprintf('saveCache(%g): saving workspace -> %s\n', level, cacheFile);
+    fprintf('saveCache(%s): saving workspace -> %s\n', label, cacheFile);
     tSave = tic;
     save(cacheFile, '-v7.3', '-struct', 'S');
-    fprintf('saveCache(%g): saved in %.2f s <- %s\n', level, toc(tSave), cacheFile);
+    fprintf('saveCache(%s): saved in %.2f s <- %s\n', label, toc(tSave), cacheFile);
 end
 
 function tf = isGraphicsOnly(x)
