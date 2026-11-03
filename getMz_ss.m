@@ -1,6 +1,11 @@
 function [Mz_ss,pMri,Mz_ss_v0,Mz_ss_max,Mo,vel] = getMz_ss(pMri,pRelax,vel,Mo)
 % getMz_ss.m  Steady-state longitudinal magnetization for GRE/FLASH (Bianciardi et al. 2016 for moving spins).
 %
+% For moving spins, Mz_ss is the average Mz over the slice column just before an RF pulse (what a
+% voxel spanning the slice measures), for plug flow perpendicular to a rectangular slice profile,
+% at any velocity (exact also for non-integer vCrit/vel). Derivation and validation:
+% docs/inflowColumnAverage.md, tests/test_getMz_ss.m.
+%
 % INPUTS
 %   pMri   - MRI acquisition struct. Required fields: TR, FA; and either (E1, q) or provide pRelax.
 %            When vel is used: sliceThickness is also required.
@@ -51,19 +56,26 @@ if nargout>2  ||  ( exist('vel','var') && ~isempty(vel) )
         Mz_ss_v0         = Mz_ss;
         Mz_ss            = nan(size(vel));
         Mz_ss(regime==1) = Mz_ss_v0;
-        % regime 2
-        if ~exist('u','var')
-            u = ceil(pMri.vCrit ./ vel(regime==2)); % number of RF seen by a spin
-        end
-        Mz_ss(regime==2) = Mz_ss_v0 + (Mo-Mz_ss_v0) .* (1 - pMri.Q1.^u)  ./  (u.*(1-pMri.Q1));
-                        % %possible AI-proposed simplification...
-                        % fMax = 1 / Mz_ss_v0;
-                        % f = (1 - pMri.Q1.^u) ./ (u * (1 - pMri.Q1));
-                        % f = min(1, max(0, f));
-                        % f(vel >= pMri.vCrit) = 1;
-                        % f(vel <= 0)  = 0;
-                        % f = 1 + f .* (fMax - 1);
-                        % Mz_ss_v0*f
+        % regime 2: average over the slice column (plug flow perpendicular to a rectangular slice).
+        % A spin at depth z into the slice has seen m = floor(z/(vel*TR)) earlier pulses; spins are
+        % uniform in z, so with U = vCrit/vel (not necessarily an integer) and K = floor(U):
+        %   <Q1^m> = [ (1-Q1^K)/(1-Q1) + (U-K)*Q1^K ] / U
+        % Provenance (details: docs/inflowColumnAverage.md, sec. 2-4):
+        %  - Mz after m pulses: Brown et al. 2014 eq. 24.5; Kim & Parker 2012 eq. 2.4.
+        %  - Signal = volume-weighted sum over slice segments with integer pulse counts: Brown et al.
+        %    2014 eq. 24.9; Gullberg et al. 1988; Gao et al. 1996 eq. 2 (which keeps partially filled
+        %    populations); Ashenagar et al. 2025.
+        %  - Integer U: the sum is Bianciardi et al. 2016 eq. 2.4, (1-Q1^U)/(U*(1-Q1)) ("for the sake of
+        %    simplicity, we assumed integer values of vC/v"); Brown et al. 2014 suggest rounding to the
+        %    nearest integer only for large U.
+        %  - The non-integer closed form above (the partial last segment, weight (U-K)/U) is derived here
+        %    from the same model, not quoted from these sources; it equals eq. 2.4 at every integer U
+        %    and matches a pulse-by-pulse simulation (tests/test_getMz_ss.m). It replaces ceil(U),
+        %    which over-saturated between integers.
+        U = pMri.vCrit ./ vel(regime==2);
+        K = floor(U);
+        f = ( (1 - pMri.Q1.^K)./(1 - pMri.Q1) + (U - K).*pMri.Q1.^K ) ./ U;
+        Mz_ss(regime==2) = Mz_ss_v0 + (Mo-Mz_ss_v0) .* f;
         % regime 3
         Mz_ss_max        = Mo;
         Mz_ss(regime==3) = Mz_ss_max;
