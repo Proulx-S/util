@@ -60,9 +60,18 @@ if nargout>2  ||  ( exist('vel','var') && ~isempty(vel) )
         % A spin at depth z into the slice has seen m = floor(z/(vel*TR)) earlier pulses; spins are
         % uniform in z, so with U = vCrit/vel (not necessarily an integer) and K = floor(U):
         %   <Q1^m> = [ (1-Q1^K)/(1-Q1) + (U-K)*Q1^K ] / U
-        % For integer U this is Bianciardi et al. 2016 eq. 2.4, (1-Q1^U)/(U*(1-Q1)), i.e. the
-        % average over velocity segments that have seen 1..U pulses (Brown et al. 2014, eq. 24.9).
-        % Rounding U (previously ceil) is exact only at integer U; see docs/inflowColumnAverage.md.
+        % Provenance (details: docs/inflowColumnAverage.md, sec. 2-4):
+        %  - Mz after m pulses: Brown et al. 2014 eq. 24.5; Kim & Parker 2012 eq. 2.4.
+        %  - Signal = volume-weighted sum over slice segments with integer pulse counts: Brown et al.
+        %    2014 eq. 24.9; Gullberg et al. 1988; Gao et al. 1996 eq. 2 (which keeps partially filled
+        %    populations); Ashenagar et al. 2025.
+        %  - Integer U: the sum is Bianciardi et al. 2016 eq. 2.4, (1-Q1^U)/(U*(1-Q1)) ("for the sake of
+        %    simplicity, we assumed integer values of vC/v"); Brown et al. 2014 suggest rounding to the
+        %    nearest integer only for large U.
+        %  - The non-integer closed form above (the partial last segment, weight (U-K)/U) is derived here
+        %    from the same model, not quoted from these sources; it equals eq. 2.4 at every integer U
+        %    and matches a pulse-by-pulse simulation (tests/test_getMz_ss.m). It replaces ceil(U),
+        %    which over-saturated between integers.
         U = pMri.vCrit ./ vel(regime==2);
         K = floor(U);
         f = ( (1 - pMri.Q1.^K)./(1 - pMri.Q1) + (U - K).*pMri.Q1.^K ) ./ U;
