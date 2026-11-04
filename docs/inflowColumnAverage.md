@@ -1,6 +1,8 @@
 # Inflow signal of slow through-plane flow: the slice-column average in `getMz_ss`
 
-> **Erratum (2026-11-03), branch `dev-erratum-inflowColumn`.** From e566edf (2026-03-20) until this
+> **Erratum (2026-11-03), on separate branches only:** `errata` (from `main`), `dev-inflow-errata`
+> and `dev-postISMRM-errata`. The existing branches are deliberately left unchanged, so they remain
+> the reproducible default; check out an errata branch to get the fix. From e566edf (2026-03-20) until this
 > fix, `getMz_ss` regime 2 ($0 < v < v_c$) evaluated the integer-$u$ column average with
 > `u = ceil(vCrit/vel)`. That is exact only when $v_c/v$ is an integer. In between, the result is
 > too saturated by up to 12 % of the inflow excess at 40° and 49 % at 90°, and $M_z(v)$ becomes a
@@ -185,8 +187,10 @@ not `ceil`, so its values are unchanged (to $10^{-9}$).
 other branch except `dev-FVEdemoSim`. That includes `dev`, `dev-inflow`, `dev-postISMRM`,
 `dev-multiVencISMRM2026`, `dev-qvfMRI`, `dev-xinAndSava2026`, `Miller2026` and `mainLegacy`.
 `dev-FVEdemoSim` uses the continuous $u = v_c/v$ instead, which is off by up to +2 % of the excess
-(see the frozen record in §8). The fix lands on `main`. A branch that should be corrected needs
-this branch merged in, or the `getMz_ss.m` change cherry-picked.
+(see the frozen record in §8). The fix is **not** merged into any of them, by design: they stay as they were, for
+reproducibility. It lives on separate branches: `errata` (from `main`), `dev-inflow-errata` and
+`dev-postISMRM-errata`, each its base plus only the erratum commits. Another branch gets the same
+treatment by cherry-picking those commits onto a new `<base>-errata` branch.
 
 **Callers that pass velocities** (checked 2026-11-03 in the takoyaki project tree):
 
