@@ -1,14 +1,13 @@
-function test_gitToolWrappers(utilDir)
-% TEST_GITTOOLWRAPPERS  Headless test of gitToolShared / gitToolDev (D14) against throwaway repos.
+function dev_gitToolWrappers(utilDir)
+% DEV_GITTOOLWRAPPERS  Headless test of gitToolShared / gitToolDev (D14) against throwaway repos.
 %
-%   Lives on util's dev-gitTool branch (the branch, not a subfolder, keeps it out of main).
-%   Run from a util WORKTREE on that branch (not the shared clone), in one plain command:
-%     /home/sebp/MATLAB/R2025a/bin/matlab -batch "test_gitToolWrappers"
+%   Run from a util WORKTREE (not the shared clone), in one plain command:
+%     /home/sebp/MATLAB/R2025a/bin/matlab -batch "addpath dev; dev_gitToolWrappers"
 %
-% utilDir: the util copy under test (default: this file's folder). Each run creates a fresh
+% utilDir: the util copy under test (default: the folder above dev/). Each run creates a fresh
 % sandbox <utilDir>/scratch/d14test_<stamp>/ (gitignored) with a bare origin over file://, so
 % nothing is pushed to util's remote. It deletes nothing. Prints PASS/FAIL per check and a total.
-    if nargin < 1 || isempty(utilDir); utilDir = fileparts(mfilename('fullpath')); end
+    if nargin < 1 || isempty(utilDir); utilDir = fileparts(fileparts(mfilename('fullpath'))); end
     restoredefaultpath; addpath(utilDir);
     R = fullfile(utilDir, 'scratch', ['d14test_' char(datetime('now','Format','yyyyMMdd_HHmmss'))]);
     if ~exist(fullfile(utilDir, 'scratch'), 'dir'); error('dev:noScratch', 'No scratch/ in %s.', utilDir); end
