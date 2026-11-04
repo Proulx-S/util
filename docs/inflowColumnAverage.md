@@ -1,5 +1,13 @@
 # Inflow signal of slow through-plane flow: the slice-column average in `getMz_ss`
 
+> **Erratum (2026-11-03), branch `dev-erratum-inflowColumn`.** From e566edf (2026-03-20) until this
+> fix, `getMz_ss` regime 2 ($0 < v < v_c$) evaluated the integer-$u$ column average with
+> `u = ceil(vCrit/vel)`. That is exact only when $v_c/v$ is an integer. In between, the result is
+> too saturated by up to 12 % of the inflow excess at 40° and 49 % at 90°, and $M_z(v)$ becomes a
+> staircase. The fix is the exact column average for any $v_c/v$ (the boxed equation in §2), which
+> equals the old value at every integer. The no-velocity call is unchanged. §3 gives the error,
+> §6 the affected branches and callers, and §8 how the problem was found.
+
 `getMz_ss(pMri, pRelax, vel)` returns, for spins moving at `vel`, the longitudinal magnetization
 that a voxel spanning a 2D slice sees just before an RF pulse. This note derives that quantity,
 shows that the previous implementation (`u = ceil(vCrit/vel)`) was exact only when
@@ -80,18 +88,27 @@ Special cases:
 
 ### Provenance: what comes from the literature and what is derived here
 
-| Ingredient | Source |
-|---|---|
-| $M_z$ after $m$ pulses, $M_{ss} + (M_0-M_{ss})Q_1^m$ | Brown et al. (2014, eq. 24.5); Kim & Parker (2012, eq. 2.4) |
-| A spin at depth $z$ has received a whole number of pulses, $\lfloor z/(v\,TR)\rfloor$ | Brown et al. (2014, §24.1.3, segments of thickness $v\,TR$ that have seen $m = 1,\dots,n$ pulses); Kim & Parker (2012, Fig. 2.1); Ashenagar et al. (2025, integer count per tracked ensemble) |
-| Voxel signal = volume-weighted sum over these segments | Gullberg et al. (1988); Gao et al. (1996, eq. 2, including the partially filled populations $\Delta_{(m,i)}$); Brown et al. (2014, eq. 24.9) |
-| Closed form for **integer** $U$: $(1-Q_1^u)/(u(1-Q_1))$ | Bianciardi et al. (2016, eq. 2.4), who state "for the sake of simplicity, we assumed integer values of $v_C/v$"; Brown et al. (2014, eq. 24.9), who assume "an exact integer $n$" and propose rounding to the nearest integer only for large $n$ |
-| Closed form for **any** $U$ (the boxed equation) | **Derived here** from the rows above: the last segment is only partly inside the slice, with weight $(U-K)/U$. It is not quoted from any of these sources. It equals the integer form at every integer $U$, and matches a pulse-by-pulse simulation that uses no closed form (§7) |
+| Ingredient | Peer-reviewed journal articles | Textbooks |
+|---|---|---|
+| $M_z$ after $m$ pulses, $M_{ss} + (M_0-M_{ss})Q_1^m$ | Ashenagar et al. (2025, eq. 1, which reduces to it when all inter-pulse intervals equal $TR$); Bianciardi et al. (2016, eqs. 2.3–2.4) | Brown et al. (2014, eq. 24.5: valid "as long as the spin is affected by exactly $(m-1)$ pulses"); Kim & Parker (2012, eq. 2.4) |
+| A spin at depth $z$ has received a whole number of pulses, $\lfloor z/(v\,TR)\rfloor$; the slice is a stack of segments with different counts | Bianciardi et al. (2016, after eq. 2.4: "the velocity segment that last entered the slice experienced 1 RF pulse, whereas the first entered segment experienced $v_C/v$ RF pulses"); Ashenagar et al. (2025: "when the flow is slow, fluid within the first slice can be divided into partitions each having different amounts of excitation"; each ensemble's excitations are tracked to define $n$); Söderström et al. (2026, §2.5: "the number of RF pulses applied to a specific element") | Brown et al. (2014, §24.1.3: segments of thickness $v\,TR$ that have seen $m = 1,\dots,n$ pulses); Kim & Parker (2012, Fig. 2.1) |
+| Voxel signal = volume-weighted average over these segments | Gullberg et al. (1988, abstract: "contributions from a finite number of spin populations, with each population signal weighted by the fractional volume of that spin population"); Gao et al. (1996, eq. 2); Ashenagar et al. (2025: signals "averaged together within each slice"); Söderström et al. (2026, §2.5: "the mean transverse magnetization of all elements localized within the slice") | Brown et al. (2014, eq. 24.9) |
+| A population only partly inside the slice still counts, by the volume it occupies there | Gao et al. (1996, eq. 2: $\Delta_{(m,i)}$ is "the volume occupied by the $(m+i)$-labeled spin population in the selected slice", where $m$ is the most-pulsed population "still completely in the selected slice") | |
+| Closed form for **integer** $U$: $(1-Q_1^u)/(u(1-Q_1))$ | Bianciardi et al. (2016, eq. 2.4). They write $v_C/v$ in it directly, adding "for the sake of simplicity, we assumed integer values of $v_C/v$". There is no `ceil` in the paper: util added it in e566edf | Brown et al. (2014, eq. 24.9), who assume "an exact integer $n$ of velocity segments" and suggest "a subdivision according to the nearest integer" only "for arbitrary, but large values of $TH/vTR$" |
+| Closed form for **any** $U$ (the boxed equation) | **Derived here** from the rows above: the last segment is only partly inside the slice, with weight $(U-K)/U$, as in Gao et al.'s $\Delta_{(m,i)}$. No source states this closed form. It equals the integer form at every integer $U$, and matches a pulse-by-pulse simulation that uses no closed form (§7) | |
 
-So the correction does not rest on reading Bianciardi et al. (2016) alone. The model (integer pulse
-counts, volume-weighted sum) is the one shared by all the sources above. Bianciardi et al. supply
-only its integer-$U$ closed form, which is where the previous `ceil` came from. The non-integer
-generalization follows from that model and is verified numerically.
+So the correction does not rest on Bianciardi et al. (2016) alone. The model (integer pulse counts,
+volume-weighted average, partly filled populations included) is stated in peer-reviewed work
+(Gullberg et al., 1988; Gao et al., 1996; Ashenagar et al., 2025; Söderström et al., 2026) and in
+the textbook treatment Bianciardi et al. cite. Bianciardi et al. supply only its integer-$U$ closed
+form, which is where the previous `ceil` came from. The non-integer generalization follows from
+that model and is verified numerically.
+
+One consequence: at $\alpha = 90^\circ$ ($Q_1 = 0$) only the newest segment carries the excess.
+With $K \ge 1$ the bracket is exactly 1, so the average excess fraction is $1/U = v/v_c$ for
+**any** $U$. Bianciardi et al.'s linear eq. 2.6 therefore holds without the integer assumption.
+`ceil` replaces $1/U$ with the step function $1/\lceil U\rceil$, which is why its error is largest
+at 90° (49 % of the excess).
 
 ## 3. What was wrong with `u = ceil(vCrit/vel)`
 
@@ -135,6 +152,7 @@ volume it occupies.
 | Brown et al. (2014, eq. 24.9) | $S = \Lambda\,\tfrac{\sin\theta}{n}\sum_{m=1}^{n}\left[M_{ze} + (M_0-M_{ze})\,q^{m-1}\right]$ (textbook). |
 | Bianciardi et al. (2016, eq. 2.4) | The closed form of the sum above, for integer $v_C/v$. |
 | Ashenagar et al. (2025) | A dynamic model: each spin ensemble is tracked, its integer number of excitations counted, and signals "averaged together within each slice". |
+| Söderström et al. (2026, §2.5) | CSF inflow in fMRI: the slice is divided into elements, each tagged with "the number of RF pulses applied to a specific element", and the signal is "the mean transverse magnetization of all elements localized within the slice". |
 
 Gao & Liu (2012, eq. 1) give a cruder two-compartment sketch,
 $S \propto M_{sat}L + (M_{fresh}-M_{sat})V\,TR$. In it only the newest segment is fresh, so it
@@ -161,8 +179,26 @@ The call signature and outputs are unchanged. Values change only for $0 < v < v_
 velocities are passed in and $v_c/v$ is not an integer, or is an integer that floating point
 pushes just above (as with $v_c/3$). The previous values there were too saturated. The
 no-velocity call (default velocity list $v_c/u$ for integer $u$) used the integer $u$ directly,
-not `ceil`, so its values are unchanged (to $10^{-9}$). Projects calling `getMz_ss` with
-velocities: multiVencISMRM2026, microscopyValidation, olsFaa2.
+not `ceil`, so its values are unchanged (to $10^{-9}$).
+
+**Branches carrying the error** (checked 2026-11-03 on every `origin` branch): `main` and every
+other branch except `dev-FVEdemoSim`. That includes `dev`, `dev-inflow`, `dev-postISMRM`,
+`dev-multiVencISMRM2026`, `dev-qvfMRI`, `dev-xinAndSava2026`, `Miller2026` and `mainLegacy`.
+`dev-FVEdemoSim` uses the continuous $u = v_c/v$ instead, which is off by up to +2 % of the excess
+(see the frozen record in §8). The fix lands on `main`. A branch that should be corrected needs
+this branch merged in, or the `getMz_ss.m` change cherry-picked.
+
+**Callers that pass velocities** (checked 2026-11-03 in the takoyaki project tree):
+
+| Project | Calls | util it reads |
+|---|---|---|
+| multiVencISMRM2026 | `doIt.m`, `doIt_inflow.m`, `fitComplexSim.m`, `runSec11.m` | `dev-postISMRM` (`doIt`), `dev-inflow` (`doIt_inflow`) |
+| olsFaa2 | `doIt_mouse.m` | its own stripped copy in `devTools/util` (has `ceil`) |
+| pcMRAsim, every branch except `main` (`Miller2026`, `dev-xinAndSava2026`, `dev-postISMRM`, `dev-inflow`, `dev-multiVencISMRM2026`, `dev-FVEdemoSim`, `dev-qvfMRI`) | `simVesselSpins` | whichever util the calling project loads |
+
+microscopyValidation calls `getMz_ss` without velocities (unaffected), but its pcMRAsim
+`Miller2026` simulation does call it per spin. olsFaa and modulatedIrf hold stripped copies with
+`ceil`, but their scripts do not call `getMz_ss`.
 
 ## 7. Validation
 
@@ -185,7 +221,40 @@ integer $U$, both limits, and the default velocity list. Run:
 addpath(utilDir); addpath(fullfile(utilDir,'tests')); test_getMz_ss
 ```
 
+## 8. How this was found
+
+The error turned up on 2026-11-02, while the vesTrack project was porting pcMRAsim's inflow model
+to synthesize vessel time series. The question was whether the existing models account for the
+spread of pulse counts along the slice column. The investigation:
+
+- derived the column average from first principles;
+- checked it against a pulse-by-pulse recursion;
+- compared every variant in util and pcMRAsim (`ceil`, continuous $u$, and the 3D per-isochromat
+  count);
+- read the sources in §4 in full text.
+
+The write-up is kept unedited as a frozen record:
+[`docs/errata/inflowCheck-2026-11-02.md`](errata/inflowCheck-2026-11-02.md). The 3D
+per-isochromat model had a related error, fixed separately on pcMRAsim branch
+`dev-erratum-inflowCount` (`docs/inflowPulseCount.md` there).
+
 ## References
+
+How each source was read:
+
+- **Full text, 2026-11-03:**
+  - Bianciardi et al. (2016), PMC4822444, equations read from their images;
+  - Ashenagar et al. (2025), PMC12319909;
+  - Söderström et al. (2026), PMC13418971;
+  - Brown et al. (2014) §24.1 and Gao et al. (1996), from the PDFs.
+- **Full text, 2026-11-02** (the investigation in §8):
+  - Gullberg et al. (1988), pp. 437–439 only; its abstract was re-read on 2026-11-03;
+  - Kim & Parker (2012), pp. 39–42 only;
+  - Gao & Liu (2012).
+- **Not read:** Gao, Holland & Gore (1988, *Med. Phys.* 15:809), which Gao et al. (1996) cite for
+  the details of their eq. 2. It is not used as a source here.
+
+Every DOI was resolved on 2026-11-03, and its title and first author checked.
 
 Ashenagar, B., Gomez, D. E. P., & Lewis, L. D. (2025). Modeling dynamic inflow effects in fMRI to
 quantify cerebrospinal fluid flow. *Imaging Neuroscience*, 3, IMAG.a.9.
@@ -216,3 +285,7 @@ flowing during the application of spin echo pulse sequences. *Magnetic Resonance
 Kim, S.-E., & Parker, D. L. (2012). Time-of-flight angiography. In J. C. Carr & T. J. Carroll
 (Eds.), *Magnetic Resonance Angiography: Principles and Applications* (pp. 39–50). Springer.
 https://doi.org/10.1007/978-1-4419-1686-0_2 (book chapter)
+
+Söderström, P., Björnfot, C., Andersson, B. M., Malm, J., Eklund, A., & Wåhlin, A. (2026).
+Quantifying cardiac, respiratory, and low frequency components of CSF motion from fMRI inflow
+effects. *Magnetic Resonance in Medicine*, 96(4), 1916–1928. https://doi.org/10.1002/mrm.70438
