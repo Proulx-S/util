@@ -88,23 +88,23 @@ Special cases:
 - **Continuity.** The expression is continuous in $U$, including at integers, and tends to
   $M_{ss}$ as $v \to 0$ and to $M_0$ as $v \to v_c$.
 
-### Provenance: what comes from the literature and what is derived here
+### Provenance: where each ingredient comes from in the literature
 
 | Ingredient | Peer-reviewed journal articles | Textbooks |
 |---|---|---|
 | $M_z$ after $m$ pulses, $M_{ss} + (M_0-M_{ss})Q_1^m$ | Ashenagar et al. (2025, eq. 1, which reduces to it when all inter-pulse intervals equal $TR$); Bianciardi et al. (2016, eqs. 2.3–2.4) | Brown et al. (2014, eq. 24.5: valid "as long as the spin is affected by exactly $(m-1)$ pulses"); Kim & Parker (2012, eq. 2.4) |
 | A spin at depth $z$ has received a whole number of pulses, $\lfloor z/(v\,TR)\rfloor$; the slice is a stack of segments with different counts | Bianciardi et al. (2016, after eq. 2.4: "the velocity segment that last entered the slice experienced 1 RF pulse, whereas the first entered segment experienced $v_C/v$ RF pulses"); Ashenagar et al. (2025: "when the flow is slow, fluid within the first slice can be divided into partitions each having different amounts of excitation"; each ensemble's excitations are tracked to define $n$); Söderström et al. (2026, §2.5: "the number of RF pulses applied to a specific element") | Brown et al. (2014, §24.1.3: segments of thickness $v\,TR$ that have seen $m = 1,\dots,n$ pulses); Kim & Parker (2012, Fig. 2.1) |
 | Voxel signal = volume-weighted average over these segments | Gullberg et al. (1988, abstract: "contributions from a finite number of spin populations, with each population signal weighted by the fractional volume of that spin population"); Gao et al. (1996, eq. 2); Ashenagar et al. (2025: signals "averaged together within each slice"); Söderström et al. (2026, §2.5: "the mean transverse magnetization of all elements localized within the slice") | Brown et al. (2014, eq. 24.9) |
-| A population only partly inside the slice still counts, by the volume it occupies there | Gao et al. (1996, eq. 2: $\Delta_{(m,i)}$ is "the volume occupied by the $(m+i)$-labeled spin population in the selected slice", where $m$ is the most-pulsed population "still completely in the selected slice") | |
+| A population only partly inside the slice still counts, by the volume it occupies there | Gao, Holland & Gore (1988, §III.A, eq. 26, p. 811, spoiled FLASH, plug flow: "The label-$(m+1)$ spin population in the slice has experienced $m$ previous pulses and occupies the residual volume $(L - mV_0TR)\pi a^2$"); Gao et al. (1996, eq. 2: $\Delta_{(m,i)}$ is "the volume occupied by the $(m+i)$-labeled spin population in the selected slice", where $m$ is the most-pulsed population "still completely in the selected slice") | |
 | Closed form for **integer** $U$: $(1-Q_1^u)/(u(1-Q_1))$ | Bianciardi et al. (2016, eq. 2.4). They write $v_C/v$ in it directly, adding "for the sake of simplicity, we assumed integer values of $v_C/v$". There is no `ceil` in the paper: util added it in e566edf | Brown et al. (2014, eq. 24.9), who assume "an exact integer $n$ of velocity segments" and suggest "a subdivision according to the nearest integer" only "for arbitrary, but large values of $TH/vTR$" |
-| Closed form for **any** $U$ (the boxed equation) | **Derived here** from the rows above: the last segment is only partly inside the slice, with weight $(U-K)/U$, as in Gao et al.'s $\Delta_{(m,i)}$. No source states this closed form. It equals the integer form at every integer $U$, and matches a pulse-by-pulse simulation that uses no closed form (§7) | |
+| Closed form for **any** $U$ (the boxed equation) | Gao, Holland & Gore (1988, §III.A, eq. 26): their plug-flow column sum over the $m$ whole populations plus the residual one, applying Gullberg et al.'s (1988) fractional-volume method to spoiled FLASH. The boxed equation is that sum per spin, normalized by the column, with the geometric series summed: the last segment is only partly inside the slice, with weight $(U-K)/U$ (as also in Gao et al.'s 1996 $\Delta_{(m,i)}$). Only the notation is ours. It equals the integer form at every integer $U$, and matches a pulse-by-pulse simulation that uses no closed form (§7). *Corrected 2026-11-06: this row used to read "Derived here … No source states this closed form", written before Gao, Holland & Gore (1988) had been read; see References.* | |
 
 So the correction does not rest on Bianciardi et al. (2016) alone. The model (integer pulse counts,
 volume-weighted average, partly filled populations included) is stated in peer-reviewed work
-(Gullberg et al., 1988; Gao et al., 1996; Ashenagar et al., 2025; Söderström et al., 2026) and in
+(Gullberg et al., 1988; Gao, Holland & Gore, 1988; Gao et al., 1996; Ashenagar et al., 2025; Söderström et al., 2026) and in
 the textbook treatment Bianciardi et al. cite. Bianciardi et al. supply only its integer-$U$ closed
-form, which is where the previous `ceil` came from. The non-integer generalization follows from
-that model and is verified numerically.
+form, which is where the previous `ceil` came from. The non-integer generalization is Gao, Holland
+& Gore's (1988, eq. 26) plug-flow column sum, written per spin, and is verified numerically.
 
 One consequence: at $\alpha = 90^\circ$ ($Q_1 = 0$) only the newest segment carries the excess.
 With $K \ge 1$ the bracket is exactly 1, so the average excess fraction is $1/U = v/v_c$ for
@@ -255,8 +255,15 @@ How each source was read:
   - Gullberg et al. (1988), pp. 437–439 only; its abstract was re-read on 2026-11-03;
   - Kim & Parker (2012), pp. 39–42 only;
   - Gao & Liu (2012).
-- **Not read:** Gao, Holland & Gore (1988, *Med. Phys.* 15:809), which Gao et al. (1996) cite for
-  the details of their eq. 2. It is not used as a source here.
+- **Read for another note, 2026-11-06:** Gao, Holland & Gore (1988, *Med. Phys.* 15:809), which
+  Gao et al. (1996) cite for the details of their eq. 2. It was not read when this doc and the
+  frozen record (§8) were written, which is why both list it as not read and why the provenance
+  table used to call the non-integer closed form "derived here". It was then read in full
+  (page images of the Zotero scan) for microscopyValidation's note
+  `docs/inflowBetweenIntegerPulseCounts.md` (Proulx-S/microscopyValidation, private,
+  [9057997](https://github.com/Proulx-S/microscopyValidation/blob/9057997d65a96cad63419fed24daa1ba885ed6c6/docs/inflowBetweenIntegerPulseCounts.md)).
+  The section, equation, page and quote cited above come from that note, not from a reading by
+  this doc's authors.
 
 Every DOI was resolved on 2026-11-03, and its title and first author checked.
 
@@ -274,6 +281,10 @@ Brown, R. W., Cheng, Y.-C. N., Haacke, E. M., Thompson, M. R., & Venkatesan, R. 
 angiography and flow quantification. In *Magnetic Resonance Imaging: Physical Principles and
 Sequence Design* (2nd ed., pp. 701–737). Wiley. https://doi.org/10.1002/9781118633953.ch24
 (textbook)
+
+Gao, J.-H., Holland, S. K., & Gore, J. C. (1988). Nuclear magnetic resonance signal from flowing
+nuclei in rapid imaging using gradient echoes. *Medical Physics*, 15(6), 809–814.
+https://doi.org/10.1118/1.596197
 
 Gao, J.-H., & Liu, H.-L. (2012). Inflow effects on functional MRI. *NeuroImage*, 62(2), 1035–1039.
 https://doi.org/10.1016/j.neuroimage.2011.09.088
