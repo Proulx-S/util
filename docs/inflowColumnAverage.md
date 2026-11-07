@@ -78,20 +78,21 @@ Special cases:
 - **Continuity.** The expression is continuous in $U$, including at integers, and tends to
   $M_{ss}$ as $v \to 0$ and to $M_0$ as $v \to v_c$.
 
-### Provenance: what comes from the literature and what is derived here
+### Provenance: where each ingredient comes from in the literature
 
 | Ingredient | Source |
 |---|---|
 | $M_z$ after $m$ pulses, $M_{ss} + (M_0-M_{ss})Q_1^m$ | Brown et al. (2014, eq. 24.5); Kim & Parker (2012, eq. 2.4) |
 | A spin at depth $z$ has received a whole number of pulses, $\lfloor z/(v\,TR)\rfloor$ | Brown et al. (2014, §24.1.3, segments of thickness $v\,TR$ that have seen $m = 1,\dots,n$ pulses); Kim & Parker (2012, Fig. 2.1); Ashenagar et al. (2025, integer count per tracked ensemble) |
-| Voxel signal = volume-weighted sum over these segments | Gullberg et al. (1988); Gao et al. (1996, eq. 2, including the partially filled populations $\Delta_{(m,i)}$); Brown et al. (2014, eq. 24.9) |
+| Voxel signal = volume-weighted sum over these segments | Gullberg et al. (1988); Gao, Holland & Gore (1988, §III.A, eq. 26, p. 811, spoiled FLASH, plug flow: "The label-$(m+1)$ spin population in the slice has experienced $m$ previous pulses and occupies the residual volume $(L - mV_0TR)\pi a^2$"); Gao et al. (1996, eq. 2, including the partially filled populations $\Delta_{(m,i)}$); Brown et al. (2014, eq. 24.9) |
 | Closed form for **integer** $U$: $(1-Q_1^u)/(u(1-Q_1))$ | Bianciardi et al. (2016, eq. 2.4), who state "for the sake of simplicity, we assumed integer values of $v_C/v$"; Brown et al. (2014, eq. 24.9), who assume "an exact integer $n$" and propose rounding to the nearest integer only for large $n$ |
-| Closed form for **any** $U$ (the boxed equation) | **Derived here** from the rows above: the last segment is only partly inside the slice, with weight $(U-K)/U$. It is not quoted from any of these sources. It equals the integer form at every integer $U$, and matches a pulse-by-pulse simulation that uses no closed form (§7) |
+| Closed form for **any** $U$ (the boxed equation) | Gao, Holland & Gore (1988, §III.A, eq. 26): their plug-flow column sum over the $m$ whole populations plus the residual one, applying Gullberg et al.'s (1988) fractional-volume method to spoiled FLASH. The boxed equation is that sum per spin, normalized by the column, with the geometric series summed: the last segment is only partly inside the slice, with weight $(U-K)/U$. Only the notation is ours. It equals the integer form at every integer $U$, and matches a pulse-by-pulse simulation that uses no closed form (§7). *Corrected 2026-11-06: this row used to read "Derived here … not quoted from any of these sources", written before Gao, Holland & Gore (1988) had been read. The section, equation, page and quote come from microscopyValidation's note `docs/inflowBetweenIntegerPulseCounts.md` (Proulx-S/microscopyValidation, private, [9057997](https://github.com/Proulx-S/microscopyValidation/blob/9057997d65a96cad63419fed24daa1ba885ed6c6/docs/inflowBetweenIntegerPulseCounts.md)), whose authors read the paper in full; not reread for this doc.* |
 
 So the correction does not rest on reading Bianciardi et al. (2016) alone. The model (integer pulse
 counts, volume-weighted sum) is the one shared by all the sources above. Bianciardi et al. supply
 only its integer-$U$ closed form, which is where the previous `ceil` came from. The non-integer
-generalization follows from that model and is verified numerically.
+generalization is Gao, Holland & Gore's (1988, eq. 26) plug-flow column sum, written per spin, and
+is verified numerically.
 
 ## 3. What was wrong with `u = ceil(vCrit/vel)`
 
@@ -201,6 +202,10 @@ Brown, R. W., Cheng, Y.-C. N., Haacke, E. M., Thompson, M. R., & Venkatesan, R. 
 angiography and flow quantification. In *Magnetic Resonance Imaging: Physical Principles and
 Sequence Design* (2nd ed., pp. 701–737). Wiley. https://doi.org/10.1002/9781118633953.ch24
 (textbook)
+
+Gao, J.-H., Holland, S. K., & Gore, J. C. (1988). Nuclear magnetic resonance signal from flowing
+nuclei in rapid imaging using gradient echoes. *Medical Physics*, 15(6), 809–814.
+https://doi.org/10.1118/1.596197
 
 Gao, J.-H., & Liu, H.-L. (2012). Inflow effects on functional MRI. *NeuroImage*, 62(2), 1035–1039.
 https://doi.org/10.1016/j.neuroimage.2011.09.088
