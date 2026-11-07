@@ -6,6 +6,33 @@ function [Mz_ss,pMri,Mz_ss_v0,Mz_ss_max,Mo,vel] = getMz_ss(pMri,pRelax,vel,Mo)
 % at any velocity (exact also for non-integer vCrit/vel). Derivation and validation:
 % docs/inflowColumnAverage.md, tests/test_getMz_ss.m.
 %
+% INFLOW MODEL VERSION: exact (column average, piecewise linear in vel).
+%   With U = vCrit/vel and K = floor(U), the slice column holds K whole velocity segments (seen
+%   0..K-1 earlier pulses) plus one partly filled segment (seen K), each weighted by its volume:
+%   <Q1^m> = [ (1-Q1^K)/(1-Q1) + (U-K)*Q1^K ] / U. Mz_ss is therefore exactly linear in vel between
+%   vel = vCrit/K (K = 1,2,3,...), with kinks there, and equals Bianciardi et al. 2016 eq. 2.4 at
+%   every integer U. Other versions in older code (not used here): "staircase" (ceil(U) in eq. 2.4;
+%   wrong between integers, the bug fixed on this branch), "continuous-u" (eq. 2.4 at non-integer U;
+%   smooth, up to a few % high between integers), "continuous count" (Q1^n with fractional n per
+%   isochromat; too low).
+%
+% REFERENCES
+%   Bianciardi M, Toschi N, Polimeni JR, et al. (2016) The pulsatility volume index: an indicator of
+%     cerebrovascular compliance based on fast magnetic resonance imaging of cardiac and respiratory
+%     pulsatility. Phil Trans R Soc A 374:20150184. doi:10.1098/rsta.2015.0184
+%     (three-regime formulation; eq. 2.4, derived for integer vCrit/vel)
+%   Gullberg GT, Simons MA, Wehrli FW (1988) A mathematical model for signal from spins flowing during
+%     the application of spin echo pulse sequences. Magn Reson Imaging 6:437-461.
+%     doi:10.1016/0730-725X(88)90481-X (fractional-volume method: each spin population weighted by
+%     its fractional volume in the slice)
+%   Gao J-H, Holland SK, Gore JC (1988) Nuclear magnetic resonance signal from flowing nuclei in rapid
+%     imaging using gradient echoes. Med Phys 15:809-814. doi:10.1118/1.596197
+%     (that method for spoiled FLASH: the column sum including the partly filled residual segment,
+%     sec. III.A, eq. 26, for plug flow; the closed form above is its per-spin plug-flow case)
+%   Comparison of the four versions and the choice of the exact one (2026-11-06; private repo, the
+%   summary above stands on its own):
+%   https://github.com/Proulx-S/microscopyValidation/blob/9057997d65a96cad63419fed24daa1ba885ed6c6/docs/inflowBetweenIntegerPulseCounts.md
+%
 % INPUTS
 %   pMri   - MRI acquisition struct. Required fields: TR, FA; and either (E1, q) or provide pRelax.
 %            When vel is used: sliceThickness is also required.
@@ -68,10 +95,12 @@ if nargout>2  ||  ( exist('vel','var') && ~isempty(vel) )
         %  - Integer U: the sum is Bianciardi et al. 2016 eq. 2.4, (1-Q1^U)/(U*(1-Q1)) ("for the sake of
         %    simplicity, we assumed integer values of vC/v"); Brown et al. 2014 suggest rounding to the
         %    nearest integer only for large U.
-        %  - The non-integer closed form above (the partial last segment, weight (U-K)/U) is derived here
-        %    from the same model, not quoted from these sources; it equals eq. 2.4 at every integer U
-        %    and matches a pulse-by-pulse simulation (tests/test_getMz_ss.m). It replaces ceil(U),
-        %    which over-saturated between integers.
+        %  - Non-integer U (the partial last segment, weight (U-K)/U): Gao, Holland & Gore 1988,
+        %    sec. III.A, eq. 26 (residual volume (L - m*V0*TR)*pi*a^2 having seen m pulses), applying
+        %    Gullberg et al.'s 1988 fractional-volume method to spoiled FLASH. The closed form above is
+        %    its plug-flow case per spin; it equals eq. 2.4 at every integer U and matches a
+        %    pulse-by-pulse simulation (tests/test_getMz_ss.m). It replaces ceil(U), which
+        %    over-saturated between integers.
         U = pMri.vCrit ./ vel(regime==2);
         K = floor(U);
         f = ( (1 - pMri.Q1.^K)./(1 - pMri.Q1) + (U - K).*pMri.Q1.^K ) ./ U;
