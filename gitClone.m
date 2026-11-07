@@ -41,8 +41,10 @@ function gitClone(url, folder, repoSubDir, branch, allowWrite)
     % .claude/worktrees/ (or any other untracked dir) from the working tree.
     %
     % SHARED-CLONE GUARD (2026-11-06): a folder directly under $BASS_ROOT/tools (or
-    % /scratch/bass/tools) is a tool's SHARED clone, read by every project and kept on the
-    % tool's default branch (bass rule shared-tools.md, D14). For such a folder gitClone
+    % /scratch/bass/tools) cloned from github.com/Proulx-S is a tool's SHARED clone, read by
+    % every project and kept on the tool's default branch (bass rule shared-tools.md, D14).
+    % (Third-party repos there, e.g. tcltk's tcl/tk pinned on core-8-4-branch, are exempt.)
+    % For such a folder gitClone
     %   - ERRORS if asked for any other branch (it used to check it out, silently changing
     %     the code every other project runs); the message gives the project-local
     %     alternative: gitClone(url, fullfile(<projectDir>,'devTools',<tool>), ..., branch);
@@ -269,8 +271,8 @@ function gitClone(url, folder, repoSubDir, branch, allowWrite)
 
 
 function [isShared, defaultBranch] = sharedCloneGuard(url, folder, branch)
-% SHARED-CLONE GUARD. A folder directly under $BASS_ROOT/tools (or /scratch/bass/tools) is a tool's
-% SHARED clone: every project on the server reads that one copy, and it stays on the tool's default
+% SHARED-CLONE GUARD. A folder directly under $BASS_ROOT/tools (or /scratch/bass/tools), cloned from
+% github.com/Proulx-S, is a tool's SHARED clone: every project on the server reads that one copy, and it stays on the tool's default
 % branch (bass rule shared-tools.md, design D14). Checking another branch out there silently changes
 % the code every other project runs. So, before any git or filesystem action:
 %   - a branch other than the default is REFUSED, with an error naming the project-local alternative;
@@ -291,6 +293,15 @@ function [isShared, defaultBranch] = sharedCloneGuard(url, folder, branch)
         if exist(roots{k}, 'dir') && strcmp(parent, roots{k}); isShared = true; end
     end
     if ~isShared; return; end
+    % Only Seb's own tools (github.com/Proulx-S/...) are shared clones in the D14 sense. A third-party
+    % repo kept in the tools folder at a deliberate pin (e.g. tcltk's tcl/tk on core-8-4-branch, for
+    % vesselRecon) is left to gitClone's ordinary behaviour.
+    if isempty(regexpi(char(url), 'github\.com[:/]Proulx-S/', 'once'))
+        isShared = false;
+        disp(['gitClone: ' folderC ' is in the shared tools folder but ' char(url) ' is not a Proulx-S ' ...
+            'repo: the shared-clone guard does not apply.']);
+        return
+    end
     [~, tool] = fileparts(folderC);
 
     isRepo = exist(fullfile(folderC, '.git'), 'dir') || exist(fullfile(folderC, '.git'), 'file');

@@ -14,12 +14,23 @@ function dev_gitCloneSharedGuard
     S = fullfile(utilDir, 'scratch', ['gcg_' char(datetime('now','Format','yyyyMMdd_HHmmss'))]);
     tools = fullfile(S, 'bass', 'tools'); proj = fullfile(S, 'proj');
     mkdir(tools); mkdir(fullfile(proj, 'devTools'));
-    oldRoot = getenv('BASS_ROOT'); oldDir = pwd;
-    cleanup = onCleanup(@() restore(oldRoot, oldDir));
+    oldRoot = getenv('BASS_ROOT'); oldCfg = getenv('GIT_CONFIG_GLOBAL'); oldDir = pwd;
+    cleanup = onCleanup(@() restore(oldRoot, oldCfg, oldDir));
     setenv('BASS_ROOT', fullfile(S, 'bass'));
 
-    urlA = makeRemote(S, 'toolA', 'main', {'feature'});
-    urlB = makeRemote(S, 'toolB', 'dev',  {'main'});
+    % real-looking URLs (the guard keys on github.com/Proulx-S), rewritten to the sandbox remotes
+    % through a throwaway global git config, so the network is never used
+    remotes = fullfile(S, 'remotes'); mkdir(remotes);
+    cfg = fullfile(S, 'gitconfig'); fid = fopen(cfg, 'w');
+    fprintf(fid, '[url "%s/"]\n\tinsteadOf = https://github.com/Proulx-S/\n\tinsteadOf = https://github.com/tcltk/\n', remotes);
+    fclose(fid);
+    setenv('GIT_CONFIG_GLOBAL', cfg);
+    makeRemote(S, 'toolA', 'main', {'feature'});
+    makeRemote(S, 'toolB', 'dev',  {'main'});
+    makeRemote(S, 'toolT', 'main', {'core-8-4-branch'});
+    urlA = 'https://github.com/Proulx-S/toolA.git';
+    urlB = 'https://github.com/Proulx-S/toolB.git';
+    urlT = 'https://github.com/tcltk/toolT.git';
     A = fullfile(tools, 'toolA'); B = fullfile(tools, 'toolB');
     sh(['git clone -q ' urlA ' ' A]); sh(['git clone -q ' urlB ' ' B]);
     nFail = 0;
@@ -88,12 +99,21 @@ function dev_gitCloneSharedGuard
     O = fullfile(S, 'Users', 'sebp', 'tools', 'toolA');
     mkdir(fileparts(O)); gitClone(urlA, O, [], 'feature');
     nFail = nFail + check(strcmp(head(O), 'feature'), 'folder outside $BASS_ROOT/tools -> not guarded');
+    % 12. third-party repo in the shared folder, at a deliberate pin -> not guarded (tcl/tk case)
+    T = fullfile(tools, 'toolT');
+    gitClone(urlT, T, [], 'core-8-4-branch');
+    nFail = nFail + check(strcmp(head(T), 'core-8-4-branch'), 'third-party repo, pinned branch -> cloned on the pin');
+    nFail = nFail + expectOk(@() gitClone(urlT, T, [], 'core-8-4-branch'), '  ... and rerun on the pin -> ok');
+    % 13. the real projects' folder form, workDir/../../tools, resolves to the shared folder
+    W = fullfile(S, 'bass', 'projects', 'p'); mkdir(W);
+    nFail = nFail + expectErr(@() gitClone(urlA, fullfile(W, '..', '..', 'tools', 'toolA'), '', 'feature'), ...
+        'gitClone:sharedCloneBranch', 'fullfile(workDir,''..'',''..'',''tools'',tool) -> refused');
 
     fprintf('\n==== %d failed ====\nsandbox: %s\n', nFail, S);
     if nFail; error('dev_gitCloneSharedGuard:failed', '%d check(s) failed', nFail); end
 end
 
-function url = makeRemote(S, name, defaultBranch, others)
+function makeRemote(S, name, defaultBranch, others)
     url = fullfile(S, 'remotes', [name '.git']); seed = fullfile(S, 'seeds', name);
     mkdir(seed);
     sh(['git init -q -b ' defaultBranch ' ' seed]);
@@ -142,6 +162,6 @@ function f = check(ok, what)
     if ok; fprintf('  PASS  %s\n', what); f = 0; else; fprintf('  FAIL  %s\n', what); f = 1; end
 end
 
-function restore(oldRoot, oldDir)
-    setenv('BASS_ROOT', oldRoot); cd(oldDir);
+function restore(oldRoot, oldCfg, oldDir)
+    setenv('BASS_ROOT', oldRoot); setenv('GIT_CONFIG_GLOBAL', oldCfg); cd(oldDir);
 end
