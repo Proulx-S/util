@@ -1,6 +1,29 @@
 function [Mz_ss,pMri,Mz_ss_v0,Mz_ss_max,Mo,vel] = getMz_ss(pMri,pRelax,vel,Mo)
 % getMz_ss.m  Steady-state longitudinal magnetization for GRE/FLASH (Bianciardi et al. 2016 for moving spins).
 %
+% INFLOW MODEL VERSION: staircase -- KNOWN ERROR, kept unchanged on this branch for reproducibility.
+%   For 0 < vel < vCrit, regime 2 evaluates Bianciardi et al. 2016 eq. 2.4, (1-Q1^u)/(u*(1-Q1)), at
+%   u = ceil(vCrit/vel), also for the default velocity sweep used when vel is omitted. That is exact
+%   only when vCrit/vel is an integer; between integers it over-saturates (by up to 12 % of the inflow excess
+%   at FA 40 deg, 49 % at 90 deg) and makes Mz(vel) a staircase. The exact slice-column average,
+%   <Q1^m> = [(1-Q1^K)/(1-Q1) + (U-K)*Q1^K]/U with U = vCrit/vel and K = floor(U), piecewise linear
+%   in vel, is on the util errata branches (errata, Miller2026-errata, dev-inflow-errata,
+%   dev-postISMRM-errata) and is recommended. See util issue #15.
+%
+% REFERENCES
+%   Bianciardi M, Toschi N, Polimeni JR, et al. (2016) The pulsatility volume index: an indicator of
+%     cerebrovascular compliance based on fast magnetic resonance imaging of cardiac and respiratory
+%     pulsatility. Phil Trans R Soc A 374:20150184. doi:10.1098/rsta.2015.0184
+%     (three-regime formulation; eq. 2.4, derived for integer vCrit/vel)
+%   Gullberg GT, Simons MA, Wehrli FW (1988) A mathematical model for signal from spins flowing during
+%     the application of spin echo pulse sequences. Magn Reson Imaging 6:437-461.
+%     doi:10.1016/0730-725X(88)90481-X (fractional-volume method)
+%   Gao J-H, Holland SK, Gore JC (1988) Nuclear magnetic resonance signal from flowing nuclei in rapid
+%     imaging using gradient echoes. Med Phys 15:809-814. doi:10.1118/1.596197
+%     (that method for spoiled FLASH: exact for non-integer vCrit/vel, sec. III.A, eq. 26)
+%   Comparison of the four inflow versions (2026-11-06; private repo, the label above stands on its own):
+%   https://github.com/Proulx-S/microscopyValidation/blob/9057997d65a96cad63419fed24daa1ba885ed6c6/docs/inflowBetweenIntegerPulseCounts.md
+%
 % INPUTS
 %   pMri   - MRI acquisition struct. Required fields: TR, FA; and either (E1, q) or provide pRelax.
 %            When vel is used: sliceThickness is also required.
